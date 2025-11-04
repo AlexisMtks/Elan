@@ -41,12 +41,9 @@ export function Header({ variant = "default" }: HeaderProps) {
                 )}
 
                 <div className="flex items-center gap-3">
-                    <Button
-                        variant="default"
-                        onClick={() => alert("Simulation : vendre un article")}
-                    >
-                        Vendre un article
-                    </Button>
+                    <Link href="/sell">
+                        <Button>Vendre un article</Button>
+                    </Link>
 
                     {/* Icône / menu compte */}
                     <Link href="/account" aria-label="My account">
