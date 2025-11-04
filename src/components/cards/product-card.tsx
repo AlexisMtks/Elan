@@ -10,6 +10,8 @@ interface ProductCardProps {
     location?: string;
     subtitle?: string;
     variant?: ProductCardVariant;
+    footer?: React.ReactNode; // contenu personnalisable en bas
+    clickable?: boolean; // permet de désactiver le lien sur la carte
 }
 
 export function ProductCard({
@@ -19,19 +21,30 @@ export function ProductCard({
                                 location,
                                 subtitle,
                                 variant = "default",
+                                footer,
+                                clickable = true, // par défaut, la carte est cliquable
                             }: ProductCardProps) {
     const isCompact = variant === "compact";
 
+    // 👇 On choisit dynamiquement le wrapper : Link ou div simple
+    const Wrapper: any = clickable ? Link : "div";
+    const wrapperProps = clickable
+        ? { href: `/listings/${id}` }
+        : {};
+
     return (
-        <Link href={`/listings/${id}`}>
-            <Card className="h-full cursor-pointer rounded-2xl border">
-                <CardContent className="flex h-full flex-col p-0">
-                    {/* Image placeholder */}
+        <Card className="h-full rounded-2xl border">
+            <CardContent className="flex h-full flex-col p-0">
+                {/* Zone cliquable : image + texte */}
+                <Wrapper
+                    {...wrapperProps}
+                    className="flex flex-1 flex-col"
+                >
+                    {/* Placeholder image */}
                     <div className="flex aspect-[4/3] items-center justify-center rounded-t-2xl bg-muted">
                         <span className="text-xs text-muted-foreground">Image</span>
                     </div>
 
-                    {/* Infos texte */}
                     <div className="flex flex-1 flex-col gap-1 p-4">
                         <h3
                             className={`line-clamp-2 text-sm font-medium ${
@@ -48,8 +61,15 @@ export function ProductCard({
                             <p className="text-xs text-muted-foreground">{location}</p>
                         )}
                     </div>
-                </CardContent>
-            </Card>
-        </Link>
+                </Wrapper>
+
+                {/* Footer optionnel : actions / statut, etc. */}
+                {footer && (
+                    <div className="border-t px-4 py-3">
+                        {footer}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 }
