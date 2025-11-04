@@ -1,6 +1,7 @@
 import { PageTitle } from "@/components/misc/page-title";
 import { PurchasesOverview } from "@/components/purchases/purchases-overview";
 import { MyPurchaseCard } from "@/components/cards/my-purchase-card";
+import { BackToAccountButton } from "@/components/navigation/back-to-account-button";
 
 const MOCK_PURCHASES = [
     {
@@ -40,6 +41,7 @@ const MOCK_PURCHASES = [
 export default function MyPurchasesPage() {
     return (
         <div className="space-y-10">
+            <BackToAccountButton />
             <PageTitle
                 title="Mes achats"
                 subtitle="Suivez vos dépenses, vos commandes et l’historique de vos achats."

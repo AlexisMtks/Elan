@@ -1,6 +1,7 @@
 import { PageTitle } from "@/components/misc/page-title";
 import { SalesOverview } from "@/components/sales/sales-overview";
 import { ProductCarousel } from "@/components/carousels/product-carousel";
+import { BackToAccountButton } from "@/components/navigation/back-to-account-button";
 
 const MOCK_SALES_HISTORY = [
     {
@@ -32,6 +33,7 @@ const MOCK_SALES_HISTORY = [
 export default function MySalesPage() {
     return (
         <div className="space-y-10">
+            <BackToAccountButton />
             <PageTitle
                 title="Mes ventes"
                 subtitle="Visualisez vos performances de vente et votre historique."

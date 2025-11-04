@@ -2,6 +2,7 @@ import { PageTitle } from "@/components/misc/page-title";
 import { StatCard } from "@/components/misc/stat-card";
 import { PieChartPlaceholder } from "@/components/charts/pie-chart-placeholder";
 import { MyListingCard } from "@/components/cards/my-listing-card";
+import { BackToAccountButton } from "@/components/navigation/back-to-account-button";
 
 const MOCK_ACTIVE_LISTINGS = [
     {
@@ -38,6 +39,7 @@ export default function MyListingsPage() {
 
     return (
         <div className="space-y-10">
+            <BackToAccountButton />
             <PageTitle
                 title="Mes annonces"
                 subtitle="Consultez et gérez vos annonces actives et vos brouillons."
