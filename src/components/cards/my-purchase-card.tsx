@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 type PurchaseStatus = "in_progress" | "delivered" | "cancelled";
 
 interface MyPurchaseCardProps {
-    id: string;
+    id: string; // ici id = identifiant de la commande
     title: string;
     price: number;
     location?: string;
@@ -42,12 +42,13 @@ export function MyPurchaseCard({
             price={price}
             location={location}
             subtitle={`Vendeur : ${seller}`}
-            clickable={false} // on ne navigue pas encore vers le détail
+            href={`/orders/${id}`}  // 👈 clic sur la carte → détail de la commande
+            // clickable reste true par défaut
             footer={
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="text-muted-foreground">
-            Statut : {statusLabel} • {date}
-          </span>
+                    <span className="text-muted-foreground">
+                        Statut : {statusLabel} • {date}
+                    </span>
 
                     {status === "in_progress" && (
                         <Button

@@ -11,7 +11,8 @@ interface ProductCardProps {
     subtitle?: string;
     variant?: ProductCardVariant;
     footer?: React.ReactNode; // contenu personnalisable en bas
-    clickable?: boolean; // permet de désactiver le lien sur la carte
+    clickable?: boolean;      // permet de désactiver le lien sur la carte
+    href?: string;            // permet de surcharger la cible du lien
 }
 
 export function ProductCard({
@@ -23,13 +24,17 @@ export function ProductCard({
                                 variant = "default",
                                 footer,
                                 clickable = true, // par défaut, la carte est cliquable
+                                href,
                             }: ProductCardProps) {
     const isCompact = variant === "compact";
+
+    // 👇 Cible effective du lien : soit href fourni, soit la page d’annonce
+    const effectiveHref = href ?? `/listings/${id}`;
 
     // 👇 On choisit dynamiquement le wrapper : Link ou div simple
     const Wrapper: any = clickable ? Link : "div";
     const wrapperProps = clickable
-        ? { href: `/listings/${id}` }
+        ? { href: effectiveHref }
         : {};
 
     return (
