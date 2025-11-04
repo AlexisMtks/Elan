@@ -24,7 +24,7 @@ export function Footer() {
                 <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
                     <div className="flex gap-4">
                         <Link href="/faq">FAQ</Link>
-                        <Link href="/conditions">Conditions d’utilisation</Link>
+                        <Link href="/terms">Conditions d’utilisation</Link>
                         <Link href="/contact">Contact</Link>
                     </div>
                     <span>© {new Date().getFullYear()} Élan</span>

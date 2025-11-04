@@ -23,7 +23,7 @@ export function ProductCard({
     const isCompact = variant === "compact";
 
     return (
-        <Link href={`/annonce/${id}`}>
+        <Link href={`/listings/${id}`}>
             <Card className="h-full cursor-pointer rounded-2xl border">
                 <CardContent className="flex h-full flex-col p-0">
                     {/* Image placeholder */}

@@ -49,7 +49,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     </Button>
 
                     {/* Icône / menu compte */}
-                    <Link href="/compte" aria-label="Mon compte">
+                    <Link href="/account" aria-label="My account">
                         <Avatar className="h-8 w-8 cursor-pointer">
                             <AvatarFallback className="text-xs">ME</AvatarFallback>
                         </Avatar>
