@@ -1,15 +1,14 @@
 import { PageTitle } from "@/components/misc/page-title";
+import { MessagesPage } from "@/components/messages/messages-page";
 
-export default function MessagesPage() {
+export default function MessagesRoutePage() {
     return (
-        <div className="space-y-4">
+        <div className="space-y-8">
             <PageTitle
-                title="Messages"
-                subtitle="Chat with buyers and sellers."
+                title="Messagerie"
+                subtitle="Échangez avec les vendeurs et les acheteurs à propos de vos annonces et commandes."
             />
-            <p className="text-sm text-muted-foreground">
-                TODO: implement messaging UI (conversation list, chat window, message input).
-            </p>
+            <MessagesPage />
         </div>
     );
 }
