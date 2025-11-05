@@ -4,7 +4,7 @@ import { OrderTimeline } from "@/components/orders/order-timeline";
 import { Card } from "@/components/ui/card";
 
 interface OrderDetailPageProps {
-    params: Promise{ id: string };
+    params: Promise<{ id: string }>;
 }
 
 // Données mockées pour le MVP
