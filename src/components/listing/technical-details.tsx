@@ -4,7 +4,7 @@ import { SellerCard } from "./seller-card";
 
 interface TechnicalDetailsProps {
     seller: {
-        id: number;
+        id: string;
         name: string;
         listingsCount: number;
     };
