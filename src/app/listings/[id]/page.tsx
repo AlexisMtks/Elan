@@ -5,7 +5,7 @@ import { ProductCarousel } from "@/components/carousels/product-carousel";
 import { ListingActions } from "@/components/listing/listing-actions";
 
 interface ListingDetailPageProps {
-    params: { id: string };
+    params: Promise<{ id: string }>;
 }
 
 // MOCK data for MVP
@@ -34,8 +34,9 @@ const MOCK_RELATED = [
     { id: "4", title: "Rings", price: 110, location: "Toulouse" },
 ];
 
-export default function ListingDetailPage({ params }: ListingDetailPageProps) {
-    const listing = MOCK_LISTING; // plus tard: fetch by params.id
+export default async function ListingDetailPage({ params }: ListingDetailPageProps) {
+    const { id } = await params; // ✅ nouvelle syntaxe Next.js 16
+    const listing = MOCK_LISTING; // plus tard: fetch by id
 
     return (
         <div className="space-y-10">
