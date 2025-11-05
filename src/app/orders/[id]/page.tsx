@@ -126,7 +126,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             </section>
 
             {/* Historique de commande */}
-            <OrderTimeline events={order.events} />
+            {/*<OrderTimeline events={order.events} />*/}
         </div>
     );
 }
