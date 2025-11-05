@@ -4,7 +4,7 @@ import { OrderTimeline } from "@/components/orders/order-timeline";
 import { Card } from "@/components/ui/card";
 
 interface OrderDetailPageProps {
-    params: { id: string };
+    params: Promise{ id: string };
 }
 
 // Données mockées pour le MVP
@@ -50,6 +50,7 @@ const MOCK_ORDER = {
 export default function OrderDetailPage({ params }: OrderDetailPageProps) {
     // Plus tard : fetch par params.id ; pour l’instant on utilise MOCK_ORDER
     const order = { ...MOCK_ORDER, id: params.id ?? MOCK_ORDER.id };
+    const { id } = await params; // ? nouvelle syntaxe Next.js 16
 
     return (
         <div className="space-y-10">
