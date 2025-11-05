@@ -47,10 +47,11 @@ const MOCK_ORDER = {
     ],
 };
 
-export default function OrderDetailPage({ params }: OrderDetailPageProps) {
+export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
+    const { id } = await params;
+
     // Plus tard : fetch par params.id ; pour l’instant on utilise MOCK_ORDER
-    const order = { ...MOCK_ORDER, id: params.id ?? MOCK_ORDER.id };
-    const { id } = await params; // ? nouvelle syntaxe Next.js 16
+    const order = { ...MOCK_ORDER, id };
 
     return (
         <div className="space-y-10">
