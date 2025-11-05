@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { SellerCard } from "./seller-card";
+import { DetailRow } from "@/components/misc/detail-row";
 
 interface TechnicalDetailsProps {
     seller: {
@@ -27,29 +28,51 @@ export function TechnicalDetails({
         <Card className="space-y-4 rounded-2xl border p-5">
             <div className="space-y-1">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Technical details
+                    Détails techniques
                 </p>
-                <SellerCard id={seller.id} name={seller.name} listingsCount={seller.listingsCount} />
+                <SellerCard
+                    id={seller.id}
+                    name={seller.name}
+                    listingsCount={seller.listingsCount}
+                    showContactButton
+                    showProfileButton
+                />
             </div>
 
             <Separator />
 
             <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                <DetailItem label="Category" value={category} />
-                <DetailItem label="Location" value={location} />
-                <DetailItem label="Brand" value={brand} />
-                <DetailItem label="Size" value={size} />
-                <DetailItem label="Condition" value={condition} />
+                <DetailRow
+                    label="Catégorie"
+                    value={category}
+                    layout="stacked"
+                    size="sm"
+                />
+                <DetailRow
+                    label="Lieu"
+                    value={location}
+                    layout="stacked"
+                    size="sm"
+                />
+                <DetailRow
+                    label="Marque"
+                    value={brand}
+                    layout="stacked"
+                    size="sm"
+                />
+                <DetailRow
+                    label="Taille"
+                    value={size}
+                    layout="stacked"
+                    size="sm"
+                />
+                <DetailRow
+                    label="État"
+                    value={condition}
+                    layout="stacked"
+                    size="sm"
+                />
             </dl>
         </Card>
-    );
-}
-
-function DetailItem({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="space-y-0.5">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="font-medium">{value}</dd>
-        </div>
     );
 }

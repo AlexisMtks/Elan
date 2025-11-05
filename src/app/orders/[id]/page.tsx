@@ -1,6 +1,7 @@
 import { OrderStatusBar } from "@/components/orders/order-status-bar";
 import { OrderSellerInfo } from "@/components/orders/order-seller-info";
 import { OrderTimeline } from "@/components/orders/order-timeline";
+import { DetailRow } from "@/components/misc/detail-row";
 import { Card } from "@/components/ui/card";
 
 interface OrderDetailPageProps {
@@ -93,25 +94,40 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                 <Card className="rounded-2xl border p-6">
                     <div className="grid gap-8 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
                         <dl className="space-y-2 text-sm">
-                            <OrderDetailRow
+                            <DetailRow
                                 label="Numéro de commande"
                                 value={order.orderNumber}
+                                size="sm"
+                                align="right"
+                                bordered
                             />
-                            <OrderDetailRow
+                            <DetailRow
                                 label="Date de commande"
                                 value={order.orderDate}
+                                size="sm"
+                                align="right"
+                                bordered
                             />
-                            <OrderDetailRow
+                            <DetailRow
                                 label="Mode de livraison"
                                 value={order.shippingMethod}
+                                size="sm"
+                                align="right"
+                                bordered
                             />
-                            <OrderDetailRow
+                            <DetailRow
                                 label="Estimation de livraison"
                                 value={order.estimatedDelivery}
+                                size="sm"
+                                align="right"
+                                bordered
                             />
-                            <OrderDetailRow
+                            <DetailRow
                                 label="Adresse"
                                 value={`${order.addressLine1}\n${order.addressLine2}`}
+                                size="sm"
+                                align="right"
+                                bordered
                                 multiline
                             />
                         </dl>
@@ -127,25 +143,6 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
 
             {/* Historique de commande */}
             {/*<OrderTimeline events={order.events} />*/}
-        </div>
-    );
-}
-
-function OrderDetailRow({
-                            label,
-                            value,
-                            multiline,
-                        }: {
-    label: string;
-    value: string;
-    multiline?: boolean;
-}) {
-    return (
-        <div className="flex items-start justify-between gap-6 border-b pb-2 last:border-b-0">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="text-sm font-medium whitespace-pre-line text-right">
-                {value}
-            </dd>
         </div>
     );
 }

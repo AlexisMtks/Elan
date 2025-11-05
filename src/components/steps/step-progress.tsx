@@ -1,46 +1,36 @@
+import { ProgressSteps } from "@/components/steps/progress-steps";
+
 interface StepProgressProps {
-    steps: { label: string }[];
+    steps: { label: string; id?: string }[];
     currentStepIndex: number; // index de 0 à steps.length - 1
 }
 
 /**
- * Barre de progression générique pour afficher des étapes (création d’annonce,
- * suivi de commande, etc.).
+ * Barre de progression pour les formulaires multi-étapes (création d’annonce) :
+ * - pastilles numérotées pour chaque étape
+ * - barre horizontale de progression en dessous
  */
 export function StepProgress({ steps, currentStepIndex }: StepProgressProps) {
-    return (
-        <ol className="flex flex-wrap items-center gap-4 rounded-2xl bg-muted/40 px-4 py-3 text-xs sm:text-sm">
-            {steps.map((step, index) => {
-                const isCompleted = index < currentStepIndex;
-                const isActive = index === currentStepIndex;
+    const normalizedSteps = steps.map((step, index) => ({
+        id: step.id ?? String(index),
+        label: step.label,
+    }));
 
-                return (
-                    <li key={`${step.label}-${index}`} className="flex items-center gap-2">
-                        <div
-                            className={[
-                                "flex h-6 w-6 items-center justify-center rounded-full border text-[11px] font-medium",
-                                isCompleted
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : isActive
-                                        ? "border-primary bg-primary/10 text-primary"
-                                        : "border-muted-foreground/30 bg-background text-muted-foreground",
-                            ].join(" ")}
-                        >
-                            {index + 1}
-                        </div>
-                        <span
-                            className={[
-                                "whitespace-nowrap",
-                                isCompleted || isActive
-                                    ? "text-foreground"
-                                    : "text-muted-foreground",
-                            ].join(" ")}
-                        >
-              {step.label}
-            </span>
-                    </li>
-                );
-            })}
-        </ol>
+    return (
+        <div className="space-y-2">
+            {/*/!* Ligne de pastilles (comme avant) *!/*/}
+            {/*<ProgressSteps*/}
+            {/*    steps={normalizedSteps}*/}
+            {/*    currentIndex={currentStepIndex}*/}
+            {/*    variant="pills"*/}
+            {/*/>*/}
+
+            {/* Barre de progression sous les pastilles */}
+            <ProgressSteps
+                steps={normalizedSteps}
+                currentIndex={currentStepIndex}
+                variant="bar"
+            />
+        </div>
     );
 }

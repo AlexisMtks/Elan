@@ -38,6 +38,35 @@ const MOCK_PURCHASES = [
     },
 ];
 
+const MOCK_PURCHASE_STATS = (() => {
+    if (MOCK_PURCHASES.length === 0) {
+        return {
+            totalAmount: 0,
+            averagePrice: 0,
+            orders: 0,
+            delivered: 0,
+        };
+    }
+
+    const totalAmount = MOCK_PURCHASES.reduce(
+        (sum, purchase) => sum + purchase.price,
+        0
+    );
+
+    const orders = MOCK_PURCHASES.length;
+    const averagePrice = totalAmount / orders;
+    const delivered = MOCK_PURCHASES.filter(
+        (purchase) => purchase.status === "delivered"
+    ).length;
+
+    return {
+        totalAmount,
+        averagePrice,
+        orders,
+        delivered,
+    };
+})();
+
 export default function MyPurchasesPage() {
     return (
         <div className="space-y-10">
@@ -47,7 +76,8 @@ export default function MyPurchasesPage() {
                 subtitle="Suivez vos dépenses, vos commandes et l’historique de vos achats."
             />
 
-            <PurchasesOverview />
+            {/* 👇 On passe bien les stats à l’overview */}
+            <PurchasesOverview stats={MOCK_PURCHASE_STATS} />
 
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Historique de mes achats</h2>
@@ -57,7 +87,7 @@ export default function MyPurchasesPage() {
                         Vous n’avez pas encore effectué d’achat.
                     </p>
                 ) : (
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         {MOCK_PURCHASES.map((purchase) => (
                             <MyPurchaseCard
                                 key={purchase.id}
