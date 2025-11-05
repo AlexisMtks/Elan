@@ -42,10 +42,11 @@ const MOCK_REVIEWS = [
 ];
 
 interface ProfilePageProps {
-    params: { id: string };
+    params: Promise<{ id: string }>;
 }
 
-export default function ProfilePage({ params }: ProfilePageProps) {
+export default async function ProfilePage({ params }: ProfilePageProps) {
+    const { id } = await params;
     const user = MOCK_USER; // plus tard: fetch by params.id
 
     return (
