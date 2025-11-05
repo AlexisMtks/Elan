@@ -3,9 +3,12 @@ import { PageTitle } from "@/components/misc/page-title";
 export default function FaqPage() {
     return (
         <div className="space-y-4">
-            <PageTitle title="FAQ" />
+            <PageTitle
+                title="FAQ"
+                subtitle="Questions fréquentes sur la plateforme Élan."
+            />
             <p className="text-sm text-muted-foreground">
-                TODO: add frequently asked questions about Élan.
+                À faire : ajouter les questions fréquentes et leurs réponses.
             </p>
         </div>
     );

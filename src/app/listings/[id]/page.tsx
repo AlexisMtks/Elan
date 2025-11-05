@@ -79,7 +79,7 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
             </section>
 
             {/* Carousel */}
-            <ProductCarousel title="You might also like" items={MOCK_RELATED} />
+            <ProductCarousel title="Vous pourriez aussi aimer" items={MOCK_RELATED} />
         </div>
     );
 }

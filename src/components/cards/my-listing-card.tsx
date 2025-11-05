@@ -31,7 +31,7 @@ export function MyListingCard({
 
     const statusLabel =
         status === "active"
-            ? "Active"
+            ? "En ligne"
             : status === "draft"
                 ? "Brouillon"
                 : "Terminée";
@@ -50,7 +50,7 @@ export function MyListingCard({
             price={price}
             location={location}
             variant="default"
-            clickable={false} // 👈 désactive la navigation sur cette variante
+            clickable={false} // désactive la navigation sur cette variante
             footer={
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <Badge variant={statusVariant as any}>{statusLabel}</Badge>

@@ -5,10 +5,10 @@ export default function ContactPage() {
         <div className="space-y-4">
             <PageTitle
                 title="Contact"
-                subtitle="Need help? Reach out to the Élan team."
+                subtitle="Besoin d’aide ? Contactez l’équipe Élan."
             />
             <p className="text-sm text-muted-foreground">
-                TODO: implement simple contact form (simulated for the MVP).
+                À faire : ajouter un formulaire de contact simple (action simulée pour le MVP).
             </p>
         </div>
     );

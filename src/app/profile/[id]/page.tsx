@@ -60,9 +60,9 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
             <UserBio bio={user.bio} />
 
-            <ProductCarousel title="Active listings" items={MOCK_LISTINGS} />
+            <ProductCarousel title="Annonces actives" items={MOCK_LISTINGS} />
 
-            <ReviewsCarousel title="Customer reviews" reviews={MOCK_REVIEWS} />
+            <ReviewsCarousel title="Avis des acheteurs" reviews={MOCK_REVIEWS} />
         </div>
     );
 }
