@@ -5,10 +5,10 @@ interface OrderStatusBarProps {
 }
 
 const ORDER_STEPS = [
-    { id: "placed", label: "Commande passée" },
-    { id: "shipped", label: "Expédiée" },
-    { id: "delivered", label: "Livrée" },
-] as const;
+  { id: "placed", label: "Commande passée" },
+  { id: "shipped", label: "Expédiée" },
+  { id: "delivered", label: "Livrée" },
+];
 
 /**
  * Barre de progression pour l’état global d’une commande,
