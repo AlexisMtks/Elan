@@ -74,10 +74,15 @@ export function MessagesPage() {
             }
 
             const formatted = data.map((conv) => {
-                const isSeller = conv.seller?.id === currentUserId;
+                const sellerRow = conv.seller?.[0];
+                const buyerRow = conv.buyer?.[0];
+
+                const isSeller = sellerRow?.id === currentUserId;
+
                 const contactName = isSeller
-                    ? conv.buyer?.display_name ?? "Acheteur inconnu"
-                    : conv.seller?.display_name ?? "Vendeur inconnu";
+                    ? buyerRow?.display_name ?? "Acheteur inconnu"
+                    : sellerRow?.display_name ?? "Vendeur inconnu";
+
                 return {
                     id: conv.id,
                     contactName,
@@ -88,9 +93,9 @@ export function MessagesPage() {
                             dateStyle: "short",
                             timeStyle: "short",
                         })
-                        : "-",
-                    unreadCount: 0, // (à implémenter plus tard)
-                } as Conversation;
+                        : "Date inconnue",
+                    unreadCount: conv.messages?.[0]?.count ?? 0,
+                };
             });
 
             setConversations(formatted);
