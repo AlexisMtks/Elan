@@ -61,7 +61,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     </Link>
 
                     {/* Icône / menu compte */}
-                    <Link href="/account" aria-label="Mon compte">
+                    <Link href="/login" aria-label="Mon compte">
                         <Avatar className="h-8 w-8 cursor-pointer">
                             <AvatarFallback className="text-xs">ME</AvatarFallback>
                         </Avatar>
