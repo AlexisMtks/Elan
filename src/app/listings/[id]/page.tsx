@@ -62,10 +62,12 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
             ? `${listing.city}, ${listing.country}`
             : listing.city ?? listing.country ?? "Localisation non précisée";
 
+    const sellerRow = listing.seller?.[0];
+
     const seller = {
-        id: listing.seller?.id ?? "",
-        name: listing.seller?.display_name ?? "Vendeur inconnu",
-        listingsCount: listing.seller?.listings_count ?? 0,
+        id: sellerRow?.id?.toString() ?? "",
+        name: sellerRow?.display_name ?? "Vendeur inconnu",
+        listingsCount: sellerRow?.listings_count ?? 0,
     };
 
     // 2. Annonces similaires (même catégorie, autres id)
