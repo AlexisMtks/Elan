@@ -16,7 +16,7 @@ type OrderRow = {
     created_at: string;
     status: string;
     total_amount: number | null;
-    buyer: { display_name: string } | null;
+    buyer: { display_name: string }[] | null;
     order_items: OrderItemRow[] | null;
 };
 
@@ -105,7 +105,7 @@ export default async function MySalesPage() {
                                 firstItem?.price_snapshot ??
                                 0;
                             const buyerName =
-                                order.buyer?.display_name ?? "Acheteur inconnu";
+                                order.buyer?.[0]?.display_name ?? "Acheteur inconnu";
                             const date = new Date(order.created_at).toLocaleDateString(
                                 "fr-FR"
                             );
