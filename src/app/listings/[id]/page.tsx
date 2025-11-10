@@ -62,7 +62,9 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
             ? `${listing.city}, ${listing.country}`
             : listing.city ?? listing.country ?? "Localisation non précisée";
 
-    const sellerRow = listing.seller?.[0];
+    const rawSeller = listing.seller as any;
+
+    const sellerRow = Array.isArray(rawSeller) ? rawSeller[0] : rawSeller;
 
     const seller = {
         id: sellerRow?.id?.toString() ?? "",
