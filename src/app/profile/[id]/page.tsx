@@ -31,7 +31,7 @@ type ReviewRow = {
     id: number;
     rating: number;
     comment: string | null;
-    reviewer: { display_name: string } | null;
+    reviewer: { display_name: string }[] | null;
 };
 
 export default async function ProfilePage({ params }: ProfilePageProps) {
@@ -111,7 +111,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
     const reviewItems = reviews.map((r) => ({
         id: r.id.toString(),
-        author: r.reviewer?.display_name ?? "Membre Élan",
+        author: r.reviewer?.[0]?.display_name ?? "Membre Élan",
         rating: r.rating ?? 0,
         content: r.comment ?? "",
     }));
