@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,23 +11,91 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
 /**
- * Formulaire de création de compte complet (version étendue).
- * Reflète les principaux champs de la table public.profiles.
+ * Formulaire de création de compte connecté à Supabase Auth + profiles.
  */
 export function RegisterForm() {
-    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const router = useRouter();
+    const [loading, setLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        setErrorMsg(null);
+        setLoading(true);
 
         const formData = new FormData(event.currentTarget);
-        const password = formData.get("password");
-        const confirm = formData.get("password_confirm");
+
+        const email = formData.get("email") as string;
+        const password = formData.get("password") as string;
+        const confirm = formData.get("password_confirm") as string;
 
         if (password !== confirm) {
-            alert("Les mots de passe ne correspondent pas.");
+            setErrorMsg("Les mots de passe ne correspondent pas.");
+            setLoading(false);
             return;
         }
 
-        alert("Simulation : création de votre compte avec profil complet.");
+        // 1. Création du compte Auth
+        const { data: authData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+        });
+
+        if (signUpError) {
+            console.error("Erreur signUp :", signUpError);
+            setErrorMsg(signUpError.message || "Erreur lors de la création du compte.");
+            setLoading(false);
+            return;
+        }
+
+        const user = authData?.user ?? null;
+        const session = authData?.session ?? null;
+
+        if (!user) {
+            setErrorMsg("Erreur lors de la création du compte (utilisateur introuvable).");
+            setLoading(false);
+            return;
+        }
+
+        // 2. Si aucune session (email de confirmation nécessaire), on informe l’utilisateur
+        if (!session) {
+            // Dans ce cas, la RLS empêchera de créer le profil côté client.
+            setErrorMsg(
+                "Votre compte a été créé. Veuillez vérifier vos e-mails pour confirmer votre adresse avant de compléter votre profil."
+            );
+            setLoading(false);
+            return;
+        }
+
+        // 3. Création du profil lié (auth.uid() = user.id OK grâce à la session)
+        const { error: profileError } = await supabase.from("profiles").insert({
+            id: user.id,
+            display_name: formData.get("display_name"),
+            city: formData.get("city"),
+            country: formData.get("country"),
+            avatar_url: formData.get("avatar_url"),
+            bio: formData.get("bio"),
+            phone_number: formData.get("phone_number"),
+            // les autres champs ont des valeurs par défaut dans le schéma
+        });
+
+        if (profileError) {
+            console.error("Erreur profil :", {
+                message: profileError.message,
+                details: profileError.details,
+                hint: profileError.hint,
+                code: profileError.code,
+            });
+            setErrorMsg(
+                "Votre compte a été créé, mais une erreur est survenue lors de la création du profil."
+            );
+            setLoading(false);
+            return;
+        }
+
+        alert("Votre compte et votre profil ont été créés avec succès.");
+        setLoading(false);
+        router.push("/account");
     };
 
     return (
@@ -61,25 +131,6 @@ export function RegisterForm() {
                                 type="url"
                                 placeholder="https://exemple.com/avatar.jpg"
                             />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="first_name">
-                                Prénom <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                                id="first_name"
-                                name="first_name"
-                                placeholder="Jean"
-                                required
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="last_name">
-                                Nom <span className="text-red-500">*</span>
-                            </Label>
-                            <Input id="last_name" name="last_name" placeholder="Dupont" required />
                         </div>
 
                         <div className="space-y-2">
@@ -166,7 +217,8 @@ export function RegisterForm() {
 
                         <div className="space-y-2">
                             <Label htmlFor="password_confirm">
-                                Confirmation du mot de passe <span className="text-red-500">*</span>
+                                Confirmation du mot de passe{" "}
+                                <span className="text-red-500">*</span>
                             </Label>
                             <Input
                                 id="password_confirm"
@@ -180,10 +232,13 @@ export function RegisterForm() {
                     </div>
                 </section>
 
-                {/* Boutons */}
+                {errorMsg && (
+                    <p className="text-sm text-red-500 text-center">{errorMsg}</p>
+                )}
+
                 <div className="space-y-3">
-                    <Button type="submit" className="w-full">
-                        Créer mon compte
+                    <Button type="submit" className="w-full" disabled={loading}>
+                        {loading ? "Création en cours..." : "Créer mon compte"}
                     </Button>
 
                     <div className="text-center text-xs text-muted-foreground">
