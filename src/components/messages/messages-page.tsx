@@ -76,6 +76,7 @@ export function MessagesPage() {
             const formatted = data.map((conv) => {
                 const sellerRow = conv.seller?.[0];
                 const buyerRow = conv.buyer?.[0];
+                const listingRow = conv.listing?.[0];
 
                 const isSeller = sellerRow?.id === currentUserId;
 
@@ -86,7 +87,7 @@ export function MessagesPage() {
                 return {
                     id: conv.id,
                     contactName,
-                    productTitle: conv.listing?.title ?? "Annonce supprimée",
+                    productTitle: listingRow?.title ?? "Annonce supprimée",
                     lastMessagePreview: conv.last_message_preview,
                     updatedAt: conv.last_message_at
                         ? new Date(conv.last_message_at).toLocaleString("fr-FR", {
