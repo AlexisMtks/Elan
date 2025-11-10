@@ -56,7 +56,7 @@ export default async function HomePage() {
             {products.map((p) => (
               <ProductCard
                 key={p.id}
-                id={p.id}
+                id={String(p.id)}
                 title={p.title}
                 // Prix en euros (stocké en centimes en base)
                 price={p.price / 100}
