@@ -2,69 +2,75 @@ import { PageTitle } from "@/components/misc/page-title";
 import { SalesOverview } from "@/components/sales/sales-overview";
 import { BackToAccountButton } from "@/components/navigation/back-to-account-button";
 import { MySaleCard } from "@/components/cards/my-sale-card";
+import { supabase } from "@/lib/supabaseClient";
 
-const MOCK_SALES = [
-    {
-        id: "1",
-        title: "Paire d’anneaux",
-        price: 120,
-        buyer: "Club Gym Paris",
-        date: "15/04/2024",
-        status: "delivered" as const,
-    },
-    {
-        id: "2",
-        title: "Justaucorps rouge",
-        price: 35,
-        buyer: "Sophie Martin",
-        date: "10/04/2024",
-        status: "delivered" as const,
-    },
-    {
-        id: "3",
-        title: "Poutre d’équilibre",
-        price: 290,
-        buyer: "Club Gym Lyon",
-        date: "02/04/2024",
-        status: "in_progress" as const,
-    },
-    {
-        id: "4",
-        title: "Cerceau de gymnastique",
-        price: 20,
-        buyer: "Boutique Gym Nantes",
-        date: "25/05/2024",
-        status: "cancelled" as const,
-    },
-];
+type SaleStatus = "in_progress" | "delivered" | "cancelled";
 
-const MOCK_SALES_STATS = (() => {
-    if (MOCK_SALES.length === 0) {
-        return {
-            totalGain: 0,
-            averageGainPerSale: 0,
-            totalPriceDiff: 0,
-            averagePriceDiffPercent: 0,
-        };
-    }
+type OrderItemRow = {
+    title_snapshot: string | null;
+    price_snapshot: number | null;
+};
 
-    const totalGain = MOCK_SALES.reduce((sum, sale) => sum + sale.price, 0);
-    const salesCount = MOCK_SALES.length;
-    const averageGainPerSale = totalGain / salesCount;
+type OrderRow = {
+    id: number;
+    created_at: string;
+    status: string;
+    total_amount: number | null;
+    buyer: { display_name: string } | null;
+    order_items: OrderItemRow[] | null;
+};
 
-    // Pour l’instant, les écarts de prix ne sont pas calculés
+// ⚠️ TEMP : on simule l’utilisateur connecté = Marie
+const CURRENT_USER_ID = "87dd7120-b634-4cbc-a67b-c134fb1a0c15";
+
+function mapOrderStatusToSaleStatus(status: string): SaleStatus {
+    if (status === "delivered") return "delivered";
+    if (status === "cancelled") return "cancelled";
+    return "in_progress"; // pending, paid, processing, shipped...
+}
+
+export default async function MySalesPage() {
+    const { data, error } = await supabase
+        .from("orders")
+        .select(
+            `
+      id,
+      created_at,
+      status,
+      total_amount,
+      buyer:profiles!orders_buyer_id_fkey(display_name),
+      order_items (
+        title_snapshot,
+        price_snapshot
+      )
+    `
+        )
+        .eq("seller_id", CURRENT_USER_ID)
+        .order("created_at", { ascending: false });
+
+    const orders = (data ?? []) as OrderRow[];
+
+    // Stats pour SalesOverview
+    const totalGainCents = orders.reduce(
+        (sum, order) => sum + (order.total_amount ?? 0),
+        0
+    );
+    const salesCount = orders.length;
+    const averageGainPerSaleCents = salesCount
+        ? totalGainCents / salesCount
+        : 0;
+
+    // Pour l’instant on ne calcule pas vraiment l’écart de prix
     const totalPriceDiff = 0;
     const averagePriceDiffPercent = 0;
 
-    return {
-        totalGain,
-        averageGainPerSale,
+    const stats = {
+        totalGain: totalGainCents / 100,
+        averageGainPerSale: averageGainPerSaleCents / 100,
         totalPriceDiff,
         averagePriceDiffPercent,
     };
-})();
 
-export default function MySalesPage() {
     return (
         <div className="space-y-10">
             <BackToAccountButton />
@@ -73,28 +79,50 @@ export default function MySalesPage() {
                 subtitle="Visualisez vos performances de vente et l’historique de vos commandes."
             />
 
-            <SalesOverview stats={MOCK_SALES_STATS} />
+            <SalesOverview stats={stats} />
 
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Historique de mes ventes</h2>
 
-                {MOCK_SALES.length === 0 ? (
+                {error && (
+                    <p className="text-sm text-red-600">
+                        Impossible de charger vos ventes pour le moment.
+                    </p>
+                )}
+
+                {orders.length === 0 && !error ? (
                     <p className="text-sm text-muted-foreground">
                         Vous n’avez pas encore réalisé de vente.
                     </p>
                 ) : (
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        {MOCK_SALES.map((sale) => (
-                            <MySaleCard
-                                key={sale.id}
-                                id={sale.id}
-                                title={sale.title}
-                                price={sale.price}
-                                buyer={sale.buyer}
-                                date={sale.date}
-                                status={sale.status}
-                            />
-                        ))}
+                        {orders.map((order) => {
+                            const firstItem = order.order_items?.[0] ?? null;
+                            const title =
+                                firstItem?.title_snapshot ?? `Commande #${order.id}`;
+                            const priceCents =
+                                order.total_amount ??
+                                firstItem?.price_snapshot ??
+                                0;
+                            const buyerName =
+                                order.buyer?.display_name ?? "Acheteur inconnu";
+                            const date = new Date(order.created_at).toLocaleDateString(
+                                "fr-FR"
+                            );
+                            const status = mapOrderStatusToSaleStatus(order.status);
+
+                            return (
+                                <MySaleCard
+                                    key={order.id}
+                                    id={order.id.toString()}
+                                    title={title}
+                                    price={priceCents / 100}
+                                    buyer={buyerName}
+                                    date={date}
+                                    status={status}
+                                />
+                            );
+                        })}
                     </div>
                 )}
             </section>

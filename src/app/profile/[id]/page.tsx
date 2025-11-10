@@ -1,53 +1,120 @@
-import { PageTitle } from "@/components/misc/page-title";
 import { UserHeader } from "@/components/profile/user-header";
 import { UserBio } from "@/components/profile/user-bio";
 import { ProductCarousel } from "@/components/carousels/product-carousel";
 import { ReviewsCarousel } from "@/components/carousels/reviews-carousel";
-
-// MOCK data for MVP
-const MOCK_USER = {
-    id: "42",
-    name: "Marie",
-    location: "Paris",
-    listingsCount: 4,
-    rating: 4.7,
-    bio: "Coach de gymnastique artistique depuis 10 ans. Passionnée par la transmission et la valorisation du matériel sportif durable.",
-};
-
-const MOCK_LISTINGS = [
-    { id: "1", title: "Gym mat", price: 80, location: "Paris" },
-    { id: "2", title: "Beam", price: 290, location: "Lyon" },
-    { id: "3", title: "Rings", price: 110, location: "Toulouse" },
-];
-
-const MOCK_REVIEWS = [
-    {
-        id: "r1",
-        author: "Pauline",
-        rating: 5,
-        content: "Produit conforme et en parfait état. Vendeuse très réactive.",
-    },
-    {
-        id: "r2",
-        author: "Lucas",
-        rating: 4,
-        content: "Bon contact et livraison rapide, je recommande.",
-    },
-    {
-        id: "r3",
-        author: "Sophie",
-        rating: 5,
-        content: "Matériel impeccable, communication fluide.",
-    },
-];
+import { supabase } from "@/lib/supabaseClient";
 
 interface ProfilePageProps {
     params: Promise<{ id: string }>;
 }
 
+type ProfileRow = {
+    id: string;
+    display_name: string;
+    bio: string | null;
+    city: string | null;
+    country: string | null;
+    listings_count: number | null;
+    rating_avg: number | null;
+};
+
+type ListingRow = {
+    id: number;
+    title: string;
+    price: number;
+    city: string | null;
+    status: string;
+    seller_id: string;
+};
+
+type ReviewRow = {
+    id: number;
+    rating: number;
+    comment: string | null;
+    reviewer: { display_name: string } | null;
+};
+
 export default async function ProfilePage({ params }: ProfilePageProps) {
     const { id } = await params;
-    const user = MOCK_USER; // plus tard: fetch by params.id
+
+    // Profil, annonces, avis en parallèle
+    const [
+        { data: profile, error: profileError },
+        { data: listingsData },
+        { data: reviewsData },
+    ] = await Promise.all([
+        supabase
+            .from("profiles")
+            .select(
+                "id, display_name, bio, city, country, listings_count, rating_avg"
+            )
+            .eq("id", id)
+            .single(),
+        supabase
+            .from("listings")
+            .select("id, title, price, city, status, seller_id")
+            .eq("seller_id", id)
+            .eq("status", "active")
+            .order("created_at", { ascending: false }),
+        supabase
+            .from("reviews")
+            .select(
+                `
+        id,
+        rating,
+        comment,
+        reviewer:profiles!reviews_reviewer_id_fkey(display_name)
+      `
+            )
+            .eq("reviewed_id", id)
+            .order("created_at", { ascending: false }),
+    ]);
+
+    if (profileError || !profile) {
+        return (
+            <div className="space-y-4">
+                <p className="text-lg font-semibold">Profil introuvable</p>
+                <p className="text-sm text-muted-foreground">
+                    Ce profil n’existe pas ou n’est pas accessible.
+                </p>
+            </div>
+        );
+    }
+
+    const p = profile as ProfileRow;
+
+    const location =
+        p.city && p.country
+            ? `${p.city}, ${p.country}`
+            : p.city ?? p.country ?? "Localisation non renseignée";
+
+    const user = {
+        id: p.id,
+        name: p.display_name,
+        location,
+        listingsCount: p.listings_count ?? 0,
+        rating: Number(p.rating_avg ?? 0),
+        bio:
+            p.bio ??
+            "Ce membre n’a pas encore rédigé de description de profil.",
+    };
+
+    const listings = (listingsData ?? []) as ListingRow[];
+    const reviews = (reviewsData ?? []) as ReviewRow[];
+
+    const carouselItems = listings.map((l) => ({
+        id: l.id.toString(),
+        title: l.title,
+        price: l.price / 100,
+        location: l.city ?? undefined,
+    }));
+
+    const reviewItems = reviews.map((r) => ({
+        id: r.id.toString(),
+        author: r.reviewer?.display_name ?? "Membre Élan",
+        rating: r.rating ?? 0,
+        content: r.comment ?? "",
+    }));
 
     return (
         <div className="space-y-10">
@@ -60,9 +127,9 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
             <UserBio bio={user.bio} />
 
-            <ProductCarousel title="Annonces actives" items={MOCK_LISTINGS} />
+            <ProductCarousel title="Annonces actives" items={carouselItems} />
 
-            <ReviewsCarousel title="Avis des acheteurs" reviews={MOCK_REVIEWS} />
+            <ReviewsCarousel title="Avis des acheteurs" reviews={reviewItems} />
         </div>
     );
 }

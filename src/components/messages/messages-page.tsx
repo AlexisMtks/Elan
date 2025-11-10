@@ -1,18 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { supabase } from "@/lib/supabaseClient";
 
-type ConversationId = string;
+type ConversationId = number;
 
 interface Conversation {
     id: ConversationId;
     contactName: string;
     productTitle: string;
-    lastMessagePreview: string;
+    lastMessagePreview: string | null;
     updatedAt: string;
     unreadCount: number;
 }
@@ -24,97 +25,126 @@ interface Message {
     time: string;
 }
 
-const MOCK_CONVERSATIONS: Conversation[] = [
-    {
-        id: "1",
-        contactName: "Pierre Durand",
-        productTitle: "Cheval d’arçons",
-        lastMessagePreview: "Parfait, je peux passer samedi matin.",
-        updatedAt: "Aujourd’hui • 10:15",
-        unreadCount: 2,
-    },
-    {
-        id: "2",
-        contactName: "Club Gym Lyon",
-        productTitle: "Poutre d’équilibre 2m",
-        lastMessagePreview: "Merci pour votre réponse, je confirme.",
-        updatedAt: "Hier • 18:42",
-        unreadCount: 0,
-    },
-    {
-        id: "3",
-        contactName: "Sophie Martin",
-        productTitle: "Justaucorps rouge taille 36",
-        lastMessagePreview: "Je vous envoie les photos complémentaires.",
-        updatedAt: "3 avril • 14:20",
-        unreadCount: 0,
-    },
-];
-
-const MOCK_MESSAGES_BY_CONVERSATION: Record<ConversationId, Message[]> = {
-    "1": [
-        {
-            id: "m1",
-            fromMe: false,
-            content: "Bonjour, l’article est-il toujours disponible ?",
-            time: "09:02",
-        },
-        {
-            id: "m2",
-            fromMe: true,
-            content: "Oui, il est toujours disponible.",
-            time: "09:10",
-        },
-        {
-            id: "m3",
-            fromMe: false,
-            content: "Parfait, je peux passer samedi matin.",
-            time: "10:15",
-        },
-    ],
-    "2": [
-        {
-            id: "m4",
-            fromMe: true,
-            content: "Merci pour votre commande, l’envoi est prévu demain.",
-            time: "Hier • 18:42",
-        },
-    ],
-    "3": [
-        {
-            id: "m5",
-            fromMe: false,
-            content: "Je vous envoie les photos complémentaires.",
-            time: "3 avril • 14:20",
-        },
-    ],
-};
-
 /**
- * Page principale de messagerie : liste de conversations + fil de messages.
- * Toutes les actions sont simulées (alert) pour ce MVP.
+ * Page principale de messagerie : liste de conversations + fil de messages
  */
 export function MessagesPage() {
+    const [conversations, setConversations] = useState<Conversation[]>([]);
     const [selectedConversationId, setSelectedConversationId] =
-        useState<ConversationId | null>("1");
+        useState<ConversationId | null>(null);
+    const [messages, setMessages] = useState<Message[]>([]);
     const [messageInput, setMessageInput] = useState("");
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-    const selectedConversation = MOCK_CONVERSATIONS.find(
-        (conv) => conv.id === selectedConversationId
-    );
-    const messages = selectedConversationId
-        ? MOCK_MESSAGES_BY_CONVERSATION[selectedConversationId] ?? []
-        : [];
+    // 🔹 Récupérer l’utilisateur connecté
+    useEffect(() => {
+        async function fetchUser() {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+            if (user) setCurrentUserId(user.id);
+        }
+        fetchUser();
+    }, []);
 
+    // 🔹 Charger les conversations
+    useEffect(() => {
+        if (!currentUserId) return;
+
+        async function fetchConversations() {
+            const { data, error } = await supabase
+                .from("conversations")
+                .select(
+                    `
+          id,
+          last_message_at,
+          last_message_preview,
+          listing:listings ( title ),
+          buyer:profiles!conversations_buyer_id_fkey ( id, display_name ),
+          seller:profiles!conversations_seller_id_fkey ( id, display_name ),
+          messages:messages(count)
+        `
+                )
+                .or(`buyer_id.eq.${currentUserId},seller_id.eq.${currentUserId}`)
+                .order("last_message_at", { ascending: false });
+
+            if (error) {
+                console.error("Erreur chargement conversations :", error);
+                return;
+            }
+
+            const formatted = data.map((conv) => {
+                const isSeller = conv.seller?.id === currentUserId;
+                const contactName = isSeller
+                    ? conv.buyer?.display_name ?? "Acheteur inconnu"
+                    : conv.seller?.display_name ?? "Vendeur inconnu";
+                return {
+                    id: conv.id,
+                    contactName,
+                    productTitle: conv.listing?.title ?? "Annonce supprimée",
+                    lastMessagePreview: conv.last_message_preview,
+                    updatedAt: conv.last_message_at
+                        ? new Date(conv.last_message_at).toLocaleString("fr-FR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                        })
+                        : "-",
+                    unreadCount: 0, // (à implémenter plus tard)
+                } as Conversation;
+            });
+
+            setConversations(formatted);
+            if (formatted.length > 0 && !selectedConversationId) {
+                setSelectedConversationId(formatted[0].id);
+            }
+        }
+
+        fetchConversations();
+    }, [currentUserId]);
+
+    // 🔹 Charger les messages de la conversation sélectionnée
+    useEffect(() => {
+        if (!selectedConversationId || !currentUserId) return;
+
+        async function fetchMessages() {
+            const { data, error } = await supabase
+                .from("messages")
+                .select("id, sender_id, content, created_at")
+                .eq("conversation_id", selectedConversationId)
+                .order("created_at", { ascending: true });
+
+            if (error) {
+                console.error("Erreur chargement messages :", error);
+                return;
+            }
+
+            const formatted = data.map((m) => ({
+                id: m.id.toString(),
+                fromMe: m.sender_id === currentUserId,
+                content: m.content ?? "",
+                time: new Date(m.created_at).toLocaleTimeString("fr-FR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }),
+            }));
+
+            setMessages(formatted);
+        }
+
+        fetchMessages();
+    }, [selectedConversationId, currentUserId]);
+
+    // 🔹 Envoi (simulation)
     const handleSendMessage = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!messageInput.trim() || !selectedConversation) return;
-
-        alert(
-            `Simulation : envoi du message à ${selectedConversation.contactName} :\n\n"${messageInput}"`
-        );
+        if (!messageInput.trim()) return;
+        alert(`Simulation : envoi du message : "${messageInput}"`);
         setMessageInput("");
     };
+
+    const selectedConversation = conversations.find(
+        (c) => c.id === selectedConversationId
+    );
 
     return (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.6fr)]">
@@ -129,7 +159,12 @@ export function MessagesPage() {
                 </div>
 
                 <div className="mt-4 flex flex-1 flex-col gap-2 overflow-y-auto">
-                    {MOCK_CONVERSATIONS.map((conversation) => (
+                    {conversations.length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center mt-6">
+                            Aucune conversation pour le moment.
+                        </p>
+                    )}
+                    {conversations.map((conversation) => (
                         <ConversationItem
                             key={conversation.id}
                             conversation={conversation}
@@ -153,8 +188,7 @@ export function MessagesPage() {
 
                             {messages.length === 0 && (
                                 <p className="text-center text-xs text-muted-foreground">
-                                    Aucun message pour le moment. Commencez la conversation en
-                                    envoyant un premier message.
+                                    Aucun message pour le moment.
                                 </p>
                             )}
                         </div>
@@ -231,9 +265,11 @@ function ConversationItem({
                 <p className="line-clamp-1 text-[11px] text-muted-foreground">
                     {conversation.productTitle}
                 </p>
-                <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                    {conversation.lastMessagePreview}
-                </p>
+                {conversation.lastMessagePreview && (
+                    <p className="line-clamp-1 text-[11px] text-muted-foreground">
+                        {conversation.lastMessagePreview}
+                    </p>
+                )}
             </div>
             <div className="flex flex-col items-end gap-1">
         <span className="text-[10px] text-muted-foreground">

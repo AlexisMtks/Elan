@@ -17,7 +17,7 @@ export default async function HomePage() {
     .select("id, title, price, city, status")
     .eq("status", "active")
     .order("created_at", { ascending: false })
-    .limit(4);
+    .limit(4); // utiliser un caroussel ?
 
   const products = (data ?? []) as ListingRow[];
 
@@ -56,7 +56,7 @@ export default async function HomePage() {
             {products.map((p) => (
               <ProductCard
                 key={p.id}
-                id={p.id.toString()}
+                id={p.id}
                 title={p.title}
                 // Prix en euros (stocké en centimes en base)
                 price={p.price / 100}

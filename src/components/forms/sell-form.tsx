@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,19 +16,23 @@ import {
 import { ImageUpload } from "./image-upload";
 import { SellSuccessDialog } from "./sell-success-dialog";
 import { StepProgress } from "@/components/steps/step-progress";
+import { supabase } from "@/lib/supabaseClient";
 
 type SellMode = "publish" | "draft" | null;
 
-/**
- * Formulaire de création d’annonce multi-étapes :
- * 1. Informations principales
- * 2. Photos
- * 3. Résumé (placeholder MVP)
- */
+type Category = {
+    id: number;
+    name: string;
+    slug: string;
+};
+
 export function SellForm() {
     const [openDialog, setOpenDialog] = useState(false);
     const [mode, setMode] = useState<SellMode>(null);
     const [currentStep, setCurrentStep] = useState(0);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
+    const [loadingCategories, setLoadingCategories] = useState(true);
 
     const steps = [
         { label: "Informations" },
@@ -37,6 +41,25 @@ export function SellForm() {
     ];
 
     const isLastStep = currentStep === steps.length - 1;
+
+    // 🔹 Charger les catégories au montage
+    useEffect(() => {
+        async function fetchCategories() {
+            const { data, error } = await supabase
+                .from("categories")
+                .select("id, name, slug")
+                .order("name", { ascending: true });
+
+            if (error) {
+                console.error("Erreur lors du chargement des catégories :", error);
+            } else {
+                setCategories(data ?? []);
+            }
+            setLoadingCategories(false);
+        }
+
+        fetchCategories();
+    }, []);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -49,18 +72,12 @@ export function SellForm() {
         setOpenDialog(true);
     };
 
-    const goToPrevious = () => {
-        setCurrentStep((prev) => Math.max(0, prev - 1));
-    };
-
-    const goToNext = () => {
-        setCurrentStep((prev) => Math.min(steps.length - 1, prev + 1));
-    };
+    const goToPrevious = () => setCurrentStep((prev) => Math.max(0, prev - 1));
+    const goToNext = () => setCurrentStep((prev) => Math.min(steps.length - 1, prev + 1));
 
     return (
         <>
             <Card className="space-y-6 rounded-2xl border p-6">
-                {/* Barre de progression */}
                 <StepProgress steps={steps} currentStepIndex={currentStep} />
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -90,19 +107,36 @@ export function SellForm() {
                                     />
                                 </div>
 
-                                {/* Catégorie */}
+                                {/* Catégorie (liée à la BDD) */}
                                 <div className="space-y-2">
                                     <Label>Catégorie</Label>
-                                    <Select>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Choisissez une catégorie" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="apparatus">Appareil</SelectItem>
-                                            <SelectItem value="clothing">Tenue</SelectItem>
-                                            <SelectItem value="accessory">Accessoire</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    {loadingCategories ? (
+                                        <p className="text-sm text-muted-foreground">
+                                            Chargement des catégories...
+                                        </p>
+                                    ) : categories.length > 0 ? (
+                                        <Select
+                                            value={selectedCategory}
+                                            onValueChange={setSelectedCategory}
+                                        >
+                                            <SelectTrigger className="min-w-[200px] w-full">
+                                                <SelectValue placeholder="Choisissez une catégorie" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {categories
+                                                    .sort((a, b) => a.name.localeCompare(b.name))
+                                                    .map((cat) => (
+                                                        <SelectItem key={cat.id} value={cat.id.toString()}>
+                                                            {cat.name}
+                                                        </SelectItem>
+                                                    ))}
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">
+                                            Aucune catégorie disponible.
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* État */}
@@ -138,31 +172,23 @@ export function SellForm() {
                     {currentStep === 1 && (
                         <div className="space-y-4">
                             <p className="text-sm text-muted-foreground">
-                                Ajoutez des photos de votre article. Dans une version
-                                ultérieure, vous pourrez réorganiser l’ordre des images et
-                                définir une photo principale.
+                                Ajoutez des photos de votre article.
                             </p>
                             <ImageUpload />
                         </div>
                     )}
 
-                    {/* Étape 3 : résumé (placeholder MVP) */}
+                    {/* Étape 3 : résumé (placeholder) */}
                     {currentStep === 2 && (
                         <div className="space-y-3">
-                            <h2 className="text-base font-semibold">
-                                Résumé de votre annonce
-                            </h2>
+                            <h2 className="text-base font-semibold">Résumé de votre annonce</h2>
                             <p className="text-sm text-muted-foreground">
-                                Dans une version future, un récapitulatif détaillé de votre
-                                annonce (titre, prix, photos, informations techniques) sera
-                                affiché ici avant publication. Pour le moment, cette étape
-                                sert uniquement de confirmation avant l’enregistrement du
-                                brouillon ou la publication.
+                                Dans une version future, un récapitulatif détaillé sera affiché ici.
                             </p>
                         </div>
                     )}
 
-                    {/* Navigation des étapes / actions */}
+                    {/* Navigation des étapes */}
                     <div className="flex items-center justify-between gap-3">
                         <Button
                             type="button"

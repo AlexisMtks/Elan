@@ -3,16 +3,38 @@ import { FilterPanel } from "@/components/filters/filter-panel";
 import { FilterChips } from "@/components/filters/filter-chips";
 import { ProductCard } from "@/components/cards/product-card";
 import { PageTitle } from "@/components/misc/page-title";
+import { supabase } from "@/lib/supabaseClient";
 
-const MOCK_RESULTS = Array.from({ length: 8 }).map((_, i) => ({
-    id: `${i + 1}`,
-    title: "Tapis de gymnastique",
-    price: 80 + i * 10,
-    location: i % 2 === 0 ? "Paris" : "À 3 km",
-}));
+interface SearchPageProps {
+    searchParams: Promise<{ q?: string }>;
+}
 
-export default function SearchPage() {
+export default async function SearchPage({ searchParams }: SearchPageProps) {
+    const { q } = await searchParams;
+    const query = typeof q === "string" ? q.trim() : "";
+
+    // Filtres actifs mockés pour l’instant
     const activeFilters = ["Tapis", "Bon état", "Moins de 100 €"];
+
+    // Requête de base : annonces actives
+    let supaQuery = supabase
+        .from("listings")
+        .select("id, title, price, city", { count: "exact" })
+        .eq("status", "active");
+
+    // Si une recherche est saisie, on filtre sur le titre
+    if (query) {
+        supaQuery = supaQuery.ilike("title", `%${query}%`);
+    }
+
+    const { data, error, count } = await supaQuery;
+    const listings = data ?? [];
+    const total = count ?? listings.length;
+
+    const title =
+        query && query.length > 0
+            ? `${total} résultat${total > 1 ? "s" : ""} pour “${query}”`
+            : `${total} résultat${total > 1 ? "s" : ""}`;
 
     return (
         <div className="flex gap-8">
@@ -21,7 +43,7 @@ export default function SearchPage() {
             <div className="flex-1 space-y-6">
                 <div className="flex items-start justify-between gap-4">
                     <div className="space-y-3">
-                        <PageTitle title="36 résultats" />
+                        <PageTitle title={title} />
                         <FilterChips filters={activeFilters} />
                     </div>
 
@@ -30,17 +52,30 @@ export default function SearchPage() {
                     </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                    {MOCK_RESULTS.map((p) => (
-                        <ProductCard
-                            key={p.id}
-                            id={p.id}
-                            title={p.title}
-                            price={p.price}
-                            location={p.location}
-                        />
-                    ))}
-                </div>
+                {error && (
+                    <p className="text-sm text-red-600">
+                        Impossible de charger les résultats pour le moment.
+                    </p>
+                )}
+
+                {listings.length === 0 && !error ? (
+                    <p className="text-sm text-muted-foreground">
+                        Aucun résultat ne correspond à votre recherche.
+                    </p>
+                ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                        {listings.map((p) => (
+                            <ProductCard
+                                key={p.id}
+                                id={p.id}
+                                title={p.title}
+                                price={p.price / 100}
+                                location={p.city ?? undefined}
+                                variant="compact"
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
