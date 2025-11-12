@@ -22,10 +22,14 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const checkAuth = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (cancelled) return;
 
       if (!user) {
         router.replace(redirectTo);
@@ -37,7 +41,18 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
     };
 
     checkAuth();
+    return () => {
+      cancelled = true;
+    };
   }, [router, redirectTo]);
 
   return { user, checking };
+}
+
+/**
+ * Alias historique pour compatibilité.
+ * Permet d'importer `useAuthGuard` depuis le même module.
+ */
+export function useAuthGuard(options?: UseRequireAuthOptions) {
+  return useRequireAuth(options);
 }
