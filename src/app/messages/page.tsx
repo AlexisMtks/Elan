@@ -1,4 +1,3 @@
-// src/app/messages/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabaseClient";
-import {useAuthGuard, useRequireAuth} from "@/hooks/use-require-auth";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 import Link from "next/link";
 
 type ConversationId = number;
@@ -29,7 +28,7 @@ interface Message {
 }
 
 export default function MessagesPage() {
-  const { status, user } = useRequireAuth();
+  const { user, checking } = useRequireAuth();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] =
@@ -57,7 +56,7 @@ export default function MessagesPage() {
           buyer:profiles!conversations_buyer_id_fkey ( id, display_name ),
           seller:profiles!conversations_seller_id_fkey ( id, display_name ),
           messages:messages(count)
-        `,
+        `
           )
           .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
           .order("last_message_at", { ascending: false });
@@ -150,11 +149,11 @@ export default function MessagesPage() {
   };
 
   const selectedConversation = conversations.find(
-      (c) => c.id === selectedConversationId,
+      (c) => c.id === selectedConversationId
   );
 
   // ÉTATS D’AUTH
-  if (status === "checking") {
+  if (checking) {
     return (
         <p className="text-sm text-muted-foreground">
           Vérification de votre session…
@@ -162,7 +161,7 @@ export default function MessagesPage() {
     );
   }
 
-  if (status === "unauthenticated") {
+  if (!user) {
     return (
         <div className="space-y-3 text-sm">
           <p className="text-muted-foreground">
@@ -272,7 +271,7 @@ export default function MessagesPage() {
   );
 }
 
-/* --- Sous-composants inchangés (sauf import) --- */
+/* --- Sous-composants inchangés --- */
 
 interface ConversationItemProps {
   conversation: Conversation;
