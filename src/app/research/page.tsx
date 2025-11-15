@@ -13,8 +13,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     const { q } = await searchParams;
     const query = typeof q === "string" ? q.trim() : "";
 
-    // Filtres actifs mockés pour l’instant
-    const activeFilters = ["Tapis", "Bon état", "Moins de 100 €"];
+    // Filtres actifs dérivés des paramètres de recherche (plus de mock)
+    const activeFilters: string[] = [];
+
+    if (query) {
+        activeFilters.push(`Recherche : "${query}"`);
+    }
 
     // Requête de base : annonces actives
     let supaQuery = supabase
