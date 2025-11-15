@@ -13,7 +13,7 @@ import { BackToAccountButton } from "@/components/navigation/back-to-account-but
 type UiListingStatus = "active" | "draft" | "ended";
 
 type ListingRow = {
-  id: number;
+  id: string;
   title: string;
   price: number;
   city: string | null;
@@ -72,16 +72,18 @@ export default function MyListingsPage() {
     );
   }
 
-  const activeListings = listings.filter((l) => l.status === "active");
-  const draftListings = listings.filter((l) => l.status === "draft");
-  const endedListings = listings.filter((l) =>
-    ["reserved", "sold", "archived"].includes(l.status)
+  const authoredListings = listings.filter((l) =>
+      ["draft", "active", "sold"].includes(l.status)
   );
+
+  const activeListings = authoredListings.filter((l) => l.status === "active");
+  const draftListings = authoredListings.filter((l) => l.status === "draft");
+  const endedListings = authoredListings.filter((l) => l.status === "sold");
 
   const activeCount = activeListings.length;
   const draftCount = draftListings.length;
   const endedCount = endedListings.length;
-  const totalCount = activeCount + draftCount + endedCount;
+  const totalCount = authoredListings.length;
 
   return (
     <div className="space-y-10">
@@ -160,14 +162,14 @@ export default function MyListingsPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {draftListings.map((listing) => (
-              <MyListingCard
-                key={listing.id}
-                id={listing.id.toString()}
-                title={listing.title}
-                price={listing.price / 100}
-                location={listing.city ?? "Non renseigné"}
-                status={mapStatus(listing.status)}
-              />
+                <MyListingCard
+                    key={listing.id}
+                    id={listing.id}
+                    title={listing.title}
+                    price={listing.price / 100}
+                    location={listing.city ?? "Non renseigné"}
+                    status={mapStatus(listing.status)}
+                />
             ))}
           </div>
         )}

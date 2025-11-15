@@ -76,14 +76,18 @@ export function AccountPageClient() {
                 )
                 .eq("id", user.id)
                 .single(),
-            supabase.from("listings").select("id").eq("seller_id", user.id),
+              supabase
+                  .from("listings")
+                  .select("id")
+                  .eq("seller_id", user.id)
+                  .in("status", ["draft", "active", "sold"]),
             supabase.from("orders").select("id").eq("seller_id", user.id),
             supabase.from("orders").select("id").eq("buyer_id", user.id),
             supabase
                 .from("addresses")
                 .select("line1, line2, city, postcode, country")
                 .eq("user_id", user.id)
-                .order("created_at", { ascending: false })
+                // .order("created_at", { ascending: false })
                 .limit(1)
                 .maybeSingle(),
           ]);
