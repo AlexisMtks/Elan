@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,16 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ImageUpload } from "./image-upload";
 import { SellSuccessDialog } from "./sell-success-dialog";
 import { StepProgress } from "@/components/steps/step-progress";
@@ -37,10 +48,10 @@ interface SellFormInitialValues {
 }
 
 interface SellFormProps {
-    formMode?: FormMode; // "create" (par défaut) ou "edit"
-    listingId?: string; // requis en mode edit
+    formMode?: FormMode;
+    listingId?: string;
     initialValues?: SellFormInitialValues;
-    onSuccess?: () => void; // callback après succès (create ou edit)
+    onSuccess?: () => void;
 }
 
 export function SellForm({
@@ -49,6 +60,10 @@ export function SellForm({
                              initialValues,
                              onSuccess,
                          }: SellFormProps) {
+    const router = useRouter();
+
+    const [openCancelDialog, setOpenCancelDialog] = useState(false);
+
     const [openDialog, setOpenDialog] = useState(false);
     const [submitMode, setSubmitMode] = useState<SubmitMode>(null);
     const [currentStep, setCurrentStep] = useState(0);
@@ -60,7 +75,7 @@ export function SellForm({
     );
     const [loadingCategories, setLoadingCategories] = useState(true);
 
-    // Champs du formulaire (contrôlés)
+    // Champs du formulaire
     const [title, setTitle] = useState(initialValues?.title ?? "");
     const [price, setPrice] = useState(
         initialValues?.price != null ? String(initialValues.price) : "",
@@ -88,6 +103,30 @@ export function SellForm({
     ];
 
     const isLastStep = currentStep === steps.length - 1;
+
+    // 🔁 Détection des changements (pour la modale Annuler)
+    const hasChanges =
+        title.trim() !== (initialValues?.title ?? "") ||
+        description.trim() !== (initialValues?.description ?? "") ||
+        price.trim() !==
+        (initialValues?.price != null ? String(initialValues?.price) : "") ||
+        (initialValues?.categoryId != null
+            ? String(initialValues.categoryId)
+            : undefined) !== selectedCategory ||
+        (initialValues?.condition ?? null) !== condition ||
+        (initialValues?.imageUrls ?? []).join(",") !== imageUrls.join(",");
+
+    const handleCancelClick = () => {
+        setOpenCancelDialog(true);
+    };
+
+    const handleConfirmCancel = () => {
+        if (formMode === "edit") {
+            router.replace("/listings");
+        } else {
+            router.back();
+        }
+    };
 
     // 🔄 Si initialValues change (mode édition), on resynchronise les champs
     useEffect(() => {
@@ -132,7 +171,6 @@ export function SellForm({
         setSubmitMode(status === "draft" ? "draft" : "publish");
 
         try {
-            // 1) Utilisateur connecté
             const {
                 data: { user },
                 error: userError,
@@ -140,11 +178,12 @@ export function SellForm({
 
             if (userError || !user) {
                 console.error("Erreur récupération utilisateur :", userError);
-                setErrorMsg("Vous devez être connecté pour créer ou modifier une annonce.");
+                setErrorMsg(
+                    "Vous devez être connecté pour créer ou modifier une annonce.",
+                );
                 return;
             }
 
-            // 2) Validation des champs principaux
             const trimmedTitle = title.trim();
             const trimmedDescription = description.trim();
             const priceEuros = Number(price);
@@ -164,7 +203,6 @@ export function SellForm({
 
             let effectiveListingId = listingId ?? null;
 
-            // 3) Création ou mise à jour de l'annonce
             if (formMode === "create") {
                 const { data: listing, error: insertError } = await supabase
                     .from("listings")
@@ -174,7 +212,7 @@ export function SellForm({
                         description: trimmedDescription,
                         price: priceCents,
                         currency: "EUR",
-                        status, // "draft" ou "active"
+                        status,
                         category_id: categoryId,
                         brand: null,
                         condition: condition,
@@ -195,10 +233,11 @@ export function SellForm({
 
                 effectiveListingId = listing.id;
             } else {
-                // mode édition
                 if (!listingId) {
                     console.error("listingId manquant en mode édition");
-                    setErrorMsg("Impossible de modifier cette annonce (identifiant manquant).");
+                    setErrorMsg(
+                        "Impossible de modifier cette annonce (identifiant manquant).",
+                    );
                     return;
                 }
 
@@ -213,7 +252,7 @@ export function SellForm({
                         condition: condition,
                     })
                     .eq("id", listingId)
-                    .eq("seller_id", user.id); // sécurité : on ne modifie que ses propres annonces
+                    .eq("seller_id", user.id);
 
                 if (updateError) {
                     console.error("Erreur mise à jour listing :", updateError);
@@ -222,18 +261,18 @@ export function SellForm({
                 }
             }
 
-            // 4) Gestion des images associées
             if (effectiveListingId) {
                 if (formMode === "edit") {
-                    // On supprime les anciennes images pour repartir propre
                     const { error: deleteError } = await supabase
                         .from("listing_images")
                         .delete()
                         .eq("listing_id", effectiveListingId);
 
                     if (deleteError) {
-                        console.error("Erreur suppression anciennes images :", deleteError);
-                        // on continue malgré tout
+                        console.error(
+                            "Erreur suppression anciennes images :",
+                            deleteError,
+                        );
                     }
                 }
 
@@ -249,15 +288,15 @@ export function SellForm({
                         .insert(rows);
 
                     if (imagesError) {
-                        console.error("Erreur insertion listing_images :", imagesError);
-                        // on continue, l’annonce existe déjà
+                        console.error(
+                            "Erreur insertion listing_images :",
+                            imagesError,
+                        );
                     }
                 }
             }
 
-            // 5) Succès
             if (formMode === "create") {
-                // Création : on ouvre la modale + reset du formulaire
                 setOpenDialog(true);
 
                 setTitle("");
@@ -269,9 +308,7 @@ export function SellForm({
                 setCurrentStep(0);
             }
 
-            if (onSuccess) {
-                onSuccess();
-            }
+            onSuccess?.();
         } catch (err) {
             console.error("Erreur inattendue lors de la sauvegarde d’annonce :", err);
             setErrorMsg("Erreur inattendue lors de la sauvegarde de l’annonce.");
@@ -338,7 +375,7 @@ export function SellForm({
                                     />
                                 </div>
 
-                                {/* Catégorie (liée à la BDD) */}
+                                {/* Catégorie */}
                                 <div className="space-y-2">
                                     <Label>Catégorie</Label>
                                     {loadingCategories ? (
@@ -421,7 +458,7 @@ export function SellForm({
                         </div>
                     )}
 
-                    {/* Étape 3 : résumé (placeholder) */}
+                    {/* Étape 3 : résumé */}
                     {currentStep === 2 && (
                         <div className="space-y-3">
                             <h2 className="text-base font-semibold">
@@ -439,7 +476,7 @@ export function SellForm({
                         <p className="text-sm text-red-500">{errorMsg}</p>
                     )}
 
-                    {/* Navigation des étapes */}
+                    {/* Navigation */}
                     <div className="flex items-center justify-between gap-3">
                         <Button
                             type="button"
@@ -451,6 +488,15 @@ export function SellForm({
                         </Button>
 
                         <div className="flex gap-3">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={handleCancelClick}
+                                disabled={submitting}
+                            >
+                                Annuler
+                            </Button>
+
                             {!isLastStep ? (
                                 <Button type="button" onClick={goToNext}>
                                     Étape suivante
@@ -484,6 +530,30 @@ export function SellForm({
                     </div>
                 </form>
             </Card>
+
+            <AlertDialog open={openCancelDialog} onOpenChange={setOpenCancelDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {formMode === "edit"
+                                ? "Annuler la modification ?"
+                                : "Annuler la création d’annonce ?"}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {hasChanges
+                                ? "Vous avez des modifications non enregistrées. Si vous confirmez, elles seront perdues."
+                                : "Êtes-vous sûr de vouloir quitter ce formulaire ?"}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <AlertDialogFooter>
+                        <AlertDialogAction onClick={handleConfirmCancel}>
+                            Oui, quitter
+                        </AlertDialogAction>
+                        <AlertDialogCancel>Continuer l’édition</AlertDialogCancel>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {formMode === "create" && (
                 <SellSuccessDialog
