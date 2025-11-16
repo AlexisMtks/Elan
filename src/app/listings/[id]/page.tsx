@@ -55,8 +55,7 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
     }
 
     const images =
-        listing.listing_images?.map((img: any) => img.image_url) ??
-        ["/placeholder-1"];
+        listing.listing_images?.map((img: any) => img.image_url) ?? [];
 
     const location =
         listing.city && listing.country
