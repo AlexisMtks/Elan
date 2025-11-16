@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
+import { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ImagePlus } from "lucide-react";
 
 interface ImageUploadProps {
     /**
      * Callback optionnel pour remonter la liste des URLs uploadées
-     * (pour plus tard, quand on branchera sur la création de l’annonce)
+     * (utilisé par SellForm pour lier les images à l'annonce)
      */
     onChange?: (urls: string[]) => void;
     /**
@@ -62,11 +62,7 @@ export function ImageUpload({ onChange, maxImages = 6 }: ImageUploadProps) {
             }
 
             if (newUrls.length > 0) {
-                setImageUrls((prev) => {
-                    const updated = [...prev, ...newUrls];
-                    onChange?.(updated);
-                    return updated;
-                });
+                setImageUrls((prev) => [...prev, ...newUrls]);
             }
         } catch (err) {
             console.error("Erreur inattendue lors de l’upload d’images :", err);
@@ -74,6 +70,13 @@ export function ImageUpload({ onChange, maxImages = 6 }: ImageUploadProps) {
             setUploading(false);
         }
     };
+
+    // 🔹 Propager les URLs au parent une fois l'état mis à jour
+    useEffect(() => {
+        if (onChange) {
+            onChange(imageUrls);
+        }
+    }, [imageUrls, onChange]);
 
     const hasReachedLimit = imageUrls.length >= maxImages;
 
