@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent } from "react";
+import { ChangeEvent, FormEvent, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -36,17 +36,49 @@ interface AccountFormProps {
     city?: string | null;
     country?: string | null;
   };
+  onAvatarChange?: (file: File) => Promise<void> | void;
 }
 
-export function AccountForm({ profile, email, address }: AccountFormProps) {
+export function AccountForm({ profile, email, address, onAvatarChange }: AccountFormProps) {
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(
+      profile.avatarUrl ?? null
+  );
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // TODO: patch profils + adresse (Supabase) — ici on reste en simulation
     alert("Simulation : les informations du compte ont été enregistrées.");
   };
 
-  const handleChangeAvatar = () => {
-    alert("Simulation : modification de la photo de profil.");
+  // ❌ on supprime l’ancien handleChangeAvatar() qui faisait juste un alert
+  // const handleChangeAvatar = () => {
+  //   alert("Simulation : modification de la photo de profil.");
+  // };
+
+  const handleClickAvatar = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarFileChange = async (
+      event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Preview immédiate côté client
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
+
+    if (!onAvatarChange) return;
+
+    try {
+      setIsUploadingAvatar(true);
+      await onAvatarChange(file);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const initials =
@@ -58,6 +90,8 @@ export function AccountForm({ profile, email, address }: AccountFormProps) {
 
   const defaultGender: Gender =
       (profile.gender as Gender) || "unspecified";
+
+  const currentAvatarUrl = avatarPreview ?? profile.avatarUrl ?? undefined;
 
   return (
       <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl border p-6">
@@ -74,19 +108,35 @@ export function AccountForm({ profile, email, address }: AccountFormProps) {
           <div className="flex flex-col items-center gap-2 md:items-end">
             <button
                 type="button"
-                onClick={handleChangeAvatar}
+                onClick={handleClickAvatar}
                 className="group relative h-16 w-16 rounded-full"
                 aria-label="Modifier la photo de profil"
             >
               <Avatar className="h-16 w-16">
-                {profile.avatarUrl ? (
-                    <AvatarImage src={profile.avatarUrl} alt={profile.displayName} />
+                {currentAvatarUrl ? (
+                    <AvatarImage src={currentAvatarUrl} alt={profile.displayName} />
                 ) : (
                     <AvatarFallback>{initials}</AvatarFallback>
                 )}
               </Avatar>
+
               <div className="pointer-events-none absolute inset-0 rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100" />
+
+              {isUploadingAvatar && (
+                  <span className="absolute inset-0 flex items-center justify-center rounded-full text-xs text-white">
+        …
+      </span>
+              )}
             </button>
+
+            {/* Input fichier caché */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarFileChange}
+            />
           </div>
         </div>
 
