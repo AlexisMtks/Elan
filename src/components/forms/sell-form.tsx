@@ -18,7 +18,8 @@ import { SellSuccessDialog } from "./sell-success-dialog";
 import { StepProgress } from "@/components/steps/step-progress";
 import { supabase } from "@/lib/supabaseClient";
 
-type SellMode = "publish" | "draft" | null;
+type SubmitMode = "publish" | "draft" | null;
+type FormMode = "create" | "edit";
 
 type Category = {
     id: number;
@@ -26,24 +27,55 @@ type Category = {
     slug: string;
 };
 
-export function SellForm() {
+interface SellFormInitialValues {
+    title?: string;
+    price?: number;
+    description?: string;
+    categoryId?: number | null;
+    condition?: string | null;
+    imageUrls?: string[];
+}
+
+interface SellFormProps {
+    formMode?: FormMode; // "create" (par défaut) ou "edit"
+    listingId?: string; // requis en mode edit
+    initialValues?: SellFormInitialValues;
+    onSuccess?: () => void; // callback après succès (create ou edit)
+}
+
+export function SellForm({
+                             formMode = "create",
+                             listingId,
+                             initialValues,
+                             onSuccess,
+                         }: SellFormProps) {
     const [openDialog, setOpenDialog] = useState(false);
-    const [mode, setMode] = useState<SellMode>(null);
+    const [submitMode, setSubmitMode] = useState<SubmitMode>(null);
     const [currentStep, setCurrentStep] = useState(0);
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
-        undefined,
+        initialValues?.categoryId != null
+            ? String(initialValues.categoryId)
+            : undefined,
     );
     const [loadingCategories, setLoadingCategories] = useState(true);
 
     // Champs du formulaire (contrôlés)
-    const [title, setTitle] = useState("");
-    const [price, setPrice] = useState("");
-    const [description, setDescription] = useState("");
-    const [condition, setCondition] = useState<string | null>(null);
+    const [title, setTitle] = useState(initialValues?.title ?? "");
+    const [price, setPrice] = useState(
+        initialValues?.price != null ? String(initialValues.price) : "",
+    );
+    const [description, setDescription] = useState(
+        initialValues?.description ?? "",
+    );
+    const [condition, setCondition] = useState<string | null>(
+        initialValues?.condition ?? null,
+    );
 
     // Images
-    const [imageUrls, setImageUrls] = useState<string[]>([]);
+    const [imageUrls, setImageUrls] = useState<string[]>(
+        initialValues?.imageUrls ?? [],
+    );
 
     // Gestion état / erreurs
     const [submitting, setSubmitting] = useState(false);
@@ -56,6 +88,24 @@ export function SellForm() {
     ];
 
     const isLastStep = currentStep === steps.length - 1;
+
+    // 🔄 Si initialValues change (mode édition), on resynchronise les champs
+    useEffect(() => {
+        if (!initialValues) return;
+
+        setTitle(initialValues.title ?? "");
+        setPrice(
+            initialValues.price != null ? String(initialValues.price) : "",
+        );
+        setDescription(initialValues.description ?? "");
+        setCondition(initialValues.condition ?? null);
+        setSelectedCategory(
+            initialValues.categoryId != null
+                ? String(initialValues.categoryId)
+                : undefined,
+        );
+        setImageUrls(initialValues.imageUrls ?? []);
+    }, [initialValues]);
 
     // 🔹 Charger les catégories au montage
     useEffect(() => {
@@ -76,9 +126,10 @@ export function SellForm() {
         fetchCategories();
     }, []);
 
-    const createListing = async (status: "draft" | "active") => {
+    const saveListing = async (status: "draft" | "active") => {
         setErrorMsg(null);
         setSubmitting(true);
+        setSubmitMode(status === "draft" ? "draft" : "publish");
 
         try {
             // 1) Utilisateur connecté
@@ -89,7 +140,7 @@ export function SellForm() {
 
             if (userError || !user) {
                 console.error("Erreur récupération utilisateur :", userError);
-                setErrorMsg("Vous devez être connecté pour créer une annonce.");
+                setErrorMsg("Vous devez être connecté pour créer ou modifier une annonce.");
                 return;
             }
 
@@ -111,66 +162,119 @@ export function SellForm() {
 
             const categoryId = selectedCategory ? Number(selectedCategory) : null;
 
-            // 3) Insertion de l'annonce
-            const { data: listing, error: insertError } = await supabase
-                .from("listings")
-                .insert({
-                    seller_id: user.id,
-                    title: trimmedTitle,
-                    description: trimmedDescription,
-                    price: priceCents,
-                    currency: "EUR",
-                    status, // "draft" ou "active"
-                    category_id: categoryId,
-                    brand: null,
-                    condition: condition, // "new" | "very_good" | "good" | "used" | null
-                    size: null,
-                    city: null,
-                    country: null,
-                    shipping_time: null,
-                    is_negotiable: false,
-                })
-                .select("id")
-                .single();
+            let effectiveListingId = listingId ?? null;
 
-            if (insertError || !listing) {
-                console.error("Erreur insertion listing :", insertError);
-                setErrorMsg("Erreur lors de la création de l’annonce.");
-                return;
-            }
+            // 3) Création ou mise à jour de l'annonce
+            if (formMode === "create") {
+                const { data: listing, error: insertError } = await supabase
+                    .from("listings")
+                    .insert({
+                        seller_id: user.id,
+                        title: trimmedTitle,
+                        description: trimmedDescription,
+                        price: priceCents,
+                        currency: "EUR",
+                        status, // "draft" ou "active"
+                        category_id: categoryId,
+                        brand: null,
+                        condition: condition,
+                        size: null,
+                        city: null,
+                        country: null,
+                        shipping_time: null,
+                        is_negotiable: false,
+                    })
+                    .select("id")
+                    .single();
 
-            // 4) Insertion des images associées
-            if (imageUrls.length > 0) {
-                const rows = imageUrls.map((url, index) => ({
-                    listing_id: listing.id,
-                    image_url: url,
-                    position: index + 1,
-                }));
+                if (insertError || !listing) {
+                    console.error("Erreur insertion listing :", insertError);
+                    setErrorMsg("Erreur lors de la création de l’annonce.");
+                    return;
+                }
 
-                const { error: imagesError } = await supabase
-                    .from("listing_images")
-                    .insert(rows);
+                effectiveListingId = listing.id;
+            } else {
+                // mode édition
+                if (!listingId) {
+                    console.error("listingId manquant en mode édition");
+                    setErrorMsg("Impossible de modifier cette annonce (identifiant manquant).");
+                    return;
+                }
 
-                if (imagesError) {
-                    console.error("Erreur insertion listing_images :", imagesError);
-                    // On n'arrête pas tout, l’annonce est déjà créée
+                const { error: updateError } = await supabase
+                    .from("listings")
+                    .update({
+                        title: trimmedTitle,
+                        description: trimmedDescription,
+                        price: priceCents,
+                        status,
+                        category_id: categoryId,
+                        condition: condition,
+                    })
+                    .eq("id", listingId)
+                    .eq("seller_id", user.id); // sécurité : on ne modifie que ses propres annonces
+
+                if (updateError) {
+                    console.error("Erreur mise à jour listing :", updateError);
+                    setErrorMsg("Erreur lors de la mise à jour de l’annonce.");
+                    return;
                 }
             }
 
-            // 5) Succès : on ouvre la modale + reset du formulaire
-            setMode(status === "draft" ? "draft" : "publish");
-            setOpenDialog(true);
+            // 4) Gestion des images associées
+            if (effectiveListingId) {
+                if (formMode === "edit") {
+                    // On supprime les anciennes images pour repartir propre
+                    const { error: deleteError } = await supabase
+                        .from("listing_images")
+                        .delete()
+                        .eq("listing_id", effectiveListingId);
 
-            setTitle("");
-            setPrice("");
-            setDescription("");
-            setSelectedCategory(undefined);
-            setCondition(null);
-            setImageUrls([]);
-            setCurrentStep(0);
+                    if (deleteError) {
+                        console.error("Erreur suppression anciennes images :", deleteError);
+                        // on continue malgré tout
+                    }
+                }
+
+                if (imageUrls.length > 0) {
+                    const rows = imageUrls.map((url, index) => ({
+                        listing_id: effectiveListingId,
+                        image_url: url,
+                        position: index + 1,
+                    }));
+
+                    const { error: imagesError } = await supabase
+                        .from("listing_images")
+                        .insert(rows);
+
+                    if (imagesError) {
+                        console.error("Erreur insertion listing_images :", imagesError);
+                        // on continue, l’annonce existe déjà
+                    }
+                }
+            }
+
+            // 5) Succès
+            if (formMode === "create") {
+                // Création : on ouvre la modale + reset du formulaire
+                setOpenDialog(true);
+
+                setTitle("");
+                setPrice("");
+                setDescription("");
+                setSelectedCategory(undefined);
+                setCondition(null);
+                setImageUrls([]);
+                setCurrentStep(0);
+            }
+
+            if (onSuccess) {
+                onSuccess();
+            }
         } catch (err) {
-            console.error("Erreur inattendue lors de la création d’annonce :", err);
-            setErrorMsg("Erreur inattendue lors de la création de l’annonce.");
+            console.error("Erreur inattendue lors de la sauvegarde d’annonce :", err);
+            setErrorMsg("Erreur inattendue lors de la sauvegarde de l’annonce.");
         } finally {
             setSubmitting(false);
         }
@@ -184,11 +288,11 @@ export function SellForm() {
             return;
         }
 
-        await createListing("active");
+        await saveListing("active");
     };
 
     const handleSaveDraft = async () => {
-        await createListing("draft");
+        await saveListing("draft");
     };
 
     const goToPrevious = () =>
@@ -313,7 +417,7 @@ export function SellForm() {
                             <p className="text-sm text-muted-foreground">
                                 Ajoutez des photos de votre article.
                             </p>
-                            <ImageUpload onChange={setImageUrls} />
+                            <ImageUpload value={imageUrls} onChange={setImageUrls} />
                         </div>
                     )}
 
@@ -359,14 +463,20 @@ export function SellForm() {
                                         onClick={handleSaveDraft}
                                         disabled={submitting}
                                     >
-                                        {submitting && mode === "draft"
+                                        {submitting && submitMode === "draft"
                                             ? "Enregistrement..."
-                                            : "Enregistrer le brouillon"}
+                                            : formMode === "edit"
+                                                ? "Mettre en brouillon"
+                                                : "Enregistrer le brouillon"}
                                     </Button>
                                     <Button type="submit" disabled={submitting}>
-                                        {submitting && mode === "publish"
-                                            ? "Publication..."
-                                            : "Publier l’annonce"}
+                                        {submitting && submitMode === "publish"
+                                            ? formMode === "edit"
+                                                ? "Mise à jour..."
+                                                : "Publication..."
+                                            : formMode === "edit"
+                                                ? "Mettre à jour l’annonce"
+                                                : "Publier l’annonce"}
                                     </Button>
                                 </>
                             )}
@@ -375,11 +485,13 @@ export function SellForm() {
                 </form>
             </Card>
 
-            <SellSuccessDialog
-                open={openDialog}
-                onOpenChange={setOpenDialog}
-                mode={mode ?? "publish"}
-            />
+            {formMode === "create" && (
+                <SellSuccessDialog
+                    open={openDialog}
+                    onOpenChange={setOpenDialog}
+                    mode={submitMode ?? "publish"}
+                />
+            )}
         </>
     );
 }

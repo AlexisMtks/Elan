@@ -1,25 +1,40 @@
 "use client";
 
-import { useState, useRef, ChangeEvent, useEffect } from "react";
+import { useState, useRef, ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { ImagePlus } from "lucide-react";
 
 interface ImageUploadProps {
     /**
+     * Liste contrôlée des URLs d'images (mode contrôlé).
+     * Si non fournie, le composant gère son propre état interne.
+     */
+    value?: string[];
+
+    /**
      * Callback optionnel pour remonter la liste des URLs uploadées
      * (utilisé par SellForm pour lier les images à l'annonce)
      */
     onChange?: (urls: string[]) => void;
+
     /**
      * Nombre max d’images autorisées
      */
     maxImages?: number;
 }
 
-export function ImageUpload({ onChange, maxImages = 6 }: ImageUploadProps) {
-    const [imageUrls, setImageUrls] = useState<string[]>([]);
+export function ImageUpload({
+                                value,
+                                onChange,
+                                maxImages = 6,
+                            }: ImageUploadProps) {
+    // État interne utilisé uniquement si `value` n'est pas fourni
+    const [internalUrls, setInternalUrls] = useState<string[]>([]);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+    // Source de vérité : prop contrôlée ou état interne
+    const imageUrls = value ?? internalUrls;
 
     const handleClickAdd = () => {
         fileInputRef.current?.click();
@@ -62,7 +77,16 @@ export function ImageUpload({ onChange, maxImages = 6 }: ImageUploadProps) {
             }
 
             if (newUrls.length > 0) {
-                setImageUrls((prev) => [...prev, ...newUrls]);
+                const updated = [...imageUrls, ...newUrls];
+
+                // Mode contrôlé : on délègue au parent
+                if (value !== undefined) {
+                    onChange?.(updated);
+                } else {
+                    // Mode non contrôlé : on gère l'état local
+                    setInternalUrls(updated);
+                    onChange?.(updated);
+                }
             }
         } catch (err) {
             console.error("Erreur inattendue lors de l’upload d’images :", err);
@@ -71,12 +95,16 @@ export function ImageUpload({ onChange, maxImages = 6 }: ImageUploadProps) {
         }
     };
 
-    // 🔹 Propager les URLs au parent une fois l'état mis à jour
-    useEffect(() => {
-        if (onChange) {
-            onChange(imageUrls);
+    const handleRemove = (urlToRemove: string) => {
+        const updated = imageUrls.filter((url) => url !== urlToRemove);
+
+        if (value !== undefined) {
+            onChange?.(updated);
+        } else {
+            setInternalUrls(updated);
+            onChange?.(updated);
         }
-    }, [imageUrls, onChange]);
+    };
 
     const hasReachedLimit = imageUrls.length >= maxImages;
 
@@ -95,6 +123,14 @@ export function ImageUpload({ onChange, maxImages = 6 }: ImageUploadProps) {
                             alt={`Image ${index + 1}`}
                             className="h-full w-full object-cover"
                         />
+
+                        <button
+                            type="button"
+                            onClick={() => handleRemove(url)}
+                            className="absolute right-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white"
+                        >
+                            X
+                        </button>
                     </div>
                 ))}
 

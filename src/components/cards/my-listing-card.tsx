@@ -3,6 +3,7 @@
 import { ProductCard } from "@/components/cards/product-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
 
 type ListingStatus = "active" | "draft" | "ended";
 
@@ -21,8 +22,11 @@ export function MyListingCard({
                                   location,
                                   status,
                               }: MyListingCardProps) {
+    const router = useRouter();
+
     const handleEdit = () => {
-        alert("Simulation : modification de l’annonce.");
+        // Redirige vers la page d’édition de l’annonce
+        router.push(`/sell/${id}`);
     };
 
     const handleDelete = () => {
