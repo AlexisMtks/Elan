@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
   SelectTrigger,
@@ -22,6 +23,22 @@ export function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [gender, setGender] = useState<string | undefined>(undefined);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleClickAvatar = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setAvatarFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -44,7 +61,7 @@ export function RegisterForm() {
     const username = ((formData.get("username") as string) || "").trim();
     const first_name = ((formData.get("first_name") as string) || "").trim();
     const last_name = ((formData.get("last_name") as string) || "").trim();
-    const avatar_url = ((formData.get("avatar_url") as string) || "").trim() || null;
+    let avatarUrl: string | null = null;
     const city = ((formData.get("city") as string) || "").trim();
     const country = ((formData.get("country") as string) || "").trim();
     const address_line1 = ((formData.get("address") as string) || "").trim();
@@ -70,7 +87,6 @@ export function RegisterForm() {
           gender: gender ?? null,
           city,
           country,
-          avatar_url,
           bio,
           phone_number,
           address_line1,
@@ -89,8 +105,37 @@ export function RegisterForm() {
     const user = authData?.user ?? null;
     const session = authData?.session ?? null;
 
+    if (!user) {
+      setErrorMsg("Utilisateur non retourné après la création du compte.");
+      setLoading(false);
+      return;
+    }
+
+    // Upload avatar si un fichier a été sélectionné
+    if (avatarFile) {
+      try {
+        const fd = new FormData();
+        fd.append("file", avatarFile);
+        fd.append("userId", user.id);
+
+        const resAvatar = await fetch("/api/account/avatar", {
+          method: "POST",
+          body: fd,
+        });
+
+        if (resAvatar.ok) {
+          const avatarData = (await resAvatar.json()) as { publicUrl: string };
+          avatarUrl = avatarData.publicUrl; // Utilisable plus tard si tu veux
+        } else {
+          console.error("Erreur API avatar pendant l'inscription");
+        }
+      } catch (e) {
+        console.error("Erreur inattendue lors de l'upload avatar:", e);
+      }
+    }
+
     // 2️⃣ Si confirmation email requise (pas de session ouverte)
-    if (!session || !user) {
+    if (!session) {
       alert("Compte créé ! Vérifiez vos e-mails pour confirmer votre adresse.");
       setLoading(false);
       router.push("/login");
@@ -98,6 +143,7 @@ export function RegisterForm() {
     }
 
     // 3️⃣ Création / mise à jour du profil
+    // (On ne met PAS avatar_url ici pour ne pas écraser ce que met l'API)
     const { error: profileError } = await supabase.from("profiles").upsert(
         {
           id: user.id,
@@ -108,13 +154,12 @@ export function RegisterForm() {
           gender,
           city,
           country,
-          avatar_url,
           bio,
           phone_number,
           profile_visibility: "public",
           profile_type: "public",
         },
-        { onConflict: "id" }
+        { onConflict: "id" },
     );
 
     if (profileError) {
@@ -155,23 +200,47 @@ export function RegisterForm() {
               </p>
             </div>
 
+            {/* Avatar */}
+            <div className="flex items-center gap-4">
+              <div className="space-y-1">
+                <Label>Photo de profil</Label>
+                <p className="text-xs text-muted-foreground">
+                  Optionnel, vous pourrez la modifier plus tard dans votre compte.
+                </p>
+              </div>
+              <button
+                  type="button"
+                  onClick={handleClickAvatar}
+                  className="relative rounded-full border bg-muted/50 p-1"
+              >
+                <Avatar className="h-16 w-16">
+                  {avatarPreview ? (
+                      <AvatarImage src={avatarPreview} alt="Aperçu avatar" />
+                  ) : (
+                      <AvatarFallback>É</AvatarFallback>
+                  )}
+                </Avatar>
+              </button>
+              <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarFileChange}
+              />
+            </div>
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {/* Username */}
               <div className="space-y-2">
                 <Label htmlFor="username">
                   Nom d’utilisateur <span className="text-red-500">*</span>
                 </Label>
-                <Input id="username" name="username" placeholder="ex. marie_lem" required />
-              </div>
-
-              {/* Avatar */}
-              <div className="space-y-2">
-                <Label htmlFor="avatar_url">Photo de profil (URL)</Label>
                 <Input
-                    id="avatar_url"
-                    name="avatar_url"
-                    type="url"
-                    placeholder="https://exemple.com/avatar.jpg"
+                    id="username"
+                    name="username"
+                    placeholder="ex. marie_lem"
+                    required
                 />
               </div>
 
@@ -209,38 +278,29 @@ export function RegisterForm() {
 
               {/* Ville */}
               <div className="space-y-2">
-                <Label htmlFor="city">
-                  Ville <span className="text-red-500">*</span>
-                </Label>
-                <Input id="city" name="city" placeholder="Paris" required />
-              </div>
-
-              {/* Code postal */}
-              <div className="space-y-2">
-                <Label htmlFor="postcode">
-                  Code postal <span className="text-red-500">*</span>
-                </Label>
-                <Input id="postcode" name="postcode" placeholder="75000" required />
+                <Label htmlFor="city">Ville</Label>
+                <Input id="city" name="city" placeholder="ex. Lyon" />
               </div>
 
               {/* Pays */}
               <div className="space-y-2">
-                <Label htmlFor="country">
-                  Pays <span className="text-red-500">*</span>
-                </Label>
-                <Input id="country" name="country" placeholder="France" required />
+                <Label htmlFor="country">Pays</Label>
+                <Input id="country" name="country" placeholder="ex. France" />
+              </div>
+
+              {/* Code postal */}
+              <div className="space-y-2">
+                <Label htmlFor="postcode">Code postal</Label>
+                <Input id="postcode" name="postcode" placeholder="ex. 69001" />
               </div>
 
               {/* Adresse */}
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="address">
-                  Adresse postale <span className="text-red-500">*</span>
-                </Label>
+                <Label htmlFor="address">Adresse</Label>
                 <Input
                     id="address"
                     name="address"
-                    placeholder="12 rue des Fleurs, 75000 Paris"
-                    required
+                    placeholder="ex. 12 rue des Gymnastes"
                 />
               </div>
 
@@ -258,12 +318,16 @@ export function RegisterForm() {
 
           {/* Section contact */}
           <section className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="phone_number">Téléphone</Label>
-                <Input id="phone_number" name="phone_number" type="tel" placeholder="+33 6 ..." />
-              </div>
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">Connexion & contact</h2>
+              <p className="text-sm text-muted-foreground">
+                Ces informations seront utilisées pour sécuriser votre compte et
+                vous contacter si besoin.
+              </p>
+            </div>
 
+            <div className="space-y-4">
+              {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="email">
                   Adresse e-mail <span className="text-red-500">*</span>
@@ -272,23 +336,50 @@ export function RegisterForm() {
                     id="email"
                     name="email"
                     type="email"
-                    autoComplete="email"
+                    placeholder="vous@example.com"
                     required
                 />
               </div>
 
+              {/* Téléphone */}
               <div className="space-y-2">
-                <Label htmlFor="password">
-                  Mot de passe <span className="text-red-500">*</span>
-                </Label>
-                <Input id="password" name="password" type="password" required />
+                <Label htmlFor="phone_number">Téléphone (optionnel)</Label>
+                <Input
+                    id="phone_number"
+                    name="phone_number"
+                    type="tel"
+                    placeholder="ex. 06 12 34 56 78"
+                />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password_confirm">
-                  Confirmation du mot de passe <span className="text-red-500">*</span>
-                </Label>
-                <Input id="password_confirm" name="password_confirm" type="password" required />
+              {/* Mot de passe */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="password">
+                    Mot de passe <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      required
+                      minLength={6}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password_confirm">
+                    Confirmation du mot de passe{" "}
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                      id="password_confirm"
+                      name="password_confirm"
+                      type="password"
+                      required
+                      minLength={6}
+                  />
+                </div>
               </div>
             </div>
           </section>
