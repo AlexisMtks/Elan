@@ -11,12 +11,12 @@ type NegotiableValue = "all" | "yes" | "no";
 
 interface SearchPageSearchParams {
     q?: string;
-    category?: CategoryValue;
+    category?: string;      // string brute depuis l’URL
     minPrice?: string;
     maxPrice?: string;
     city?: string;
-    conditions?: string; // CSV: "new,good,used"
-    negotiable?: NegotiableValue;
+    conditions?: string;    // CSV: "new,good,used"
+    negotiable?: string;    // string brute depuis l’URL
 }
 
 interface SearchPageProps {
@@ -53,15 +53,26 @@ const CATEGORY_ID_BY_SLUG: Record<Exclude<CategoryValue, "all">, number> = {
 export default async function SearchPage({ searchParams }: SearchPageProps) {
     const resolvedParams = await searchParams;
 
-    const query = typeof resolvedParams.q === "string" ? resolvedParams.q.trim() : "";
-    const category =
-        (resolvedParams.category as CategoryValue | undefined) && resolvedParams.category !== ""
-            ? (resolvedParams.category as CategoryValue)
+    // ----------------------------
+    // 0) Normalisation des paramètres
+    // ----------------------------
+    const query =
+        typeof resolvedParams.q === "string" ? resolvedParams.q.trim() : "";
+
+    const rawCategory =
+        typeof resolvedParams.category === "string"
+            ? resolvedParams.category.trim()
+            : "";
+
+    const category: CategoryValue =
+        rawCategory && rawCategory in CATEGORY_ID_BY_SLUG
+            ? (rawCategory as Exclude<CategoryValue, "all">)
             : "all";
 
     const minPrice = resolvedParams.minPrice
         ? Number.parseInt(resolvedParams.minPrice, 10)
         : undefined;
+
     const maxPrice = resolvedParams.maxPrice
         ? Number.parseInt(resolvedParams.maxPrice, 10)
         : undefined;
@@ -69,15 +80,21 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     const city =
         typeof resolvedParams.city === "string" ? resolvedParams.city.trim() : "";
 
-    const negotiable =
-        (resolvedParams.negotiable as NegotiableValue | undefined) && resolvedParams.negotiable !== ""
-            ? (resolvedParams.negotiable as NegotiableValue)
+    const rawNegotiable =
+        typeof resolvedParams.negotiable === "string"
+            ? resolvedParams.negotiable.trim()
+            : "";
+
+    const negotiable: NegotiableValue =
+        rawNegotiable === "yes" || rawNegotiable === "no"
+            ? (rawNegotiable as NegotiableValue)
             : "all";
 
     const conditionsParam =
         typeof resolvedParams.conditions === "string"
             ? resolvedParams.conditions.trim()
             : "";
+
     const conditions: ConditionValue[] =
         conditionsParam.length > 0
             ? (conditionsParam.split(",").filter(Boolean) as ConditionValue[])
@@ -107,9 +124,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
     if (conditions.length > 0) {
         activeFilters.push(
-            conditions
-                .map((c) => CONDITION_LABELS[c] ?? c)
-                .join(" • "),
+            conditions.map((c) => CONDITION_LABELS[c] ?? c).join(" • "),
         );
     }
 
@@ -138,7 +153,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
     // Catégorie (via category_id, basé sur les seeds)
     if (category !== "all") {
-        const categoryId = CATEGORY_ID_BY_SLUG[category];
+        const categoryId = CATEGORY_ID_BY_SLUG[category as Exclude<CategoryValue, "all">];
         if (categoryId) {
             supaQuery = supaQuery.eq("category_id", categoryId);
         }
@@ -159,7 +174,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
     // Ville
     if (city) {
-        // on peut faire un ilike pour être un peu tolérant
         supaQuery = supaQuery.ilike("city", `${city}%`);
     }
 
