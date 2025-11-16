@@ -11,12 +11,12 @@ type NegotiableValue = "all" | "yes" | "no";
 
 interface SearchPageSearchParams {
     q?: string;
-    category?: string;      // string brute depuis l’URL
+    category?: string;      // ⚠️ string brute (plus CategoryValue ici)
     minPrice?: string;
     maxPrice?: string;
     city?: string;
     conditions?: string;    // CSV: "new,good,used"
-    negotiable?: string;    // string brute depuis l’URL
+    negotiable?: string;    // ⚠️ string brute (plus NegotiableValue ici)
 }
 
 interface SearchPageProps {
@@ -59,6 +59,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     const query =
         typeof resolvedParams.q === "string" ? resolvedParams.q.trim() : "";
 
+    // category: string brute -> CategoryValue
     const rawCategory =
         typeof resolvedParams.category === "string"
             ? resolvedParams.category.trim()
@@ -80,6 +81,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     const city =
         typeof resolvedParams.city === "string" ? resolvedParams.city.trim() : "";
 
+    // negotiable: string brute -> NegotiableValue
     const rawNegotiable =
         typeof resolvedParams.negotiable === "string"
             ? resolvedParams.negotiable.trim()
