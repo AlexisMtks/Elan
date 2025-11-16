@@ -8,6 +8,7 @@ interface TechnicalDetailsProps {
         id: string;
         name: string;
         listingsCount: number;
+        avatarUrl?: string | null;
     };
     category: string;
     brand?: string;
@@ -34,6 +35,7 @@ export function TechnicalDetails({
                     id={seller.id}
                     name={seller.name}
                     listingsCount={seller.listingsCount}
+                    avatarUrl={seller.avatarUrl}
                     showContactButton
                     showProfileButton
                 />

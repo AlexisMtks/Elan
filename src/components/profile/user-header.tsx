@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Star } from "lucide-react";
 
@@ -10,19 +10,15 @@ interface UserHeaderProps {
     location: string;
     listingsCount: number;
     rating: number;
+    avatarUrl?: string | null;
 }
 
-/**
- * En-tête du profil public :
- * - avatar + nom + ville
- * - note moyenne + nombre d’annonces
- * - bouton "Contacter" vers la messagerie
- */
 export function UserHeader({
                                name,
                                location,
                                listingsCount,
                                rating,
+                               avatarUrl,
                            }: UserHeaderProps) {
     const router = useRouter();
 
@@ -40,7 +36,11 @@ export function UserHeader({
         <div className="flex flex-col items-center gap-4 rounded-2xl border p-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
             <div className="flex items-center gap-4">
                 <Avatar className="h-14 w-14">
-                    <AvatarFallback>{initials}</AvatarFallback>
+                    {avatarUrl ? (
+                        <AvatarImage src={avatarUrl} alt={name} />
+                    ) : (
+                        <AvatarFallback>{initials}</AvatarFallback>
+                    )}
                 </Avatar>
                 <div>
                     <h1 className="text-xl font-semibold">{name}</h1>

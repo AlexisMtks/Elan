@@ -16,6 +16,7 @@ type ProfileRow = {
     country: string | null;
     listings_count: number | null;
     rating_avg: number | null;
+    avatar_url: string | null;
 };
 
 type ListingRow = {
@@ -46,7 +47,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         supabase
             .from("profiles")
             .select(
-                "id, display_name, bio, city, country, listings_count, rating_avg"
+                "id, display_name, bio, city, country, listings_count, rating_avg, avatar_url"
             )
             .eq("id", id)
             .single(),
@@ -97,6 +98,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         bio:
             p.bio ??
             "Ce membre n’a pas encore rédigé de description de profil.",
+        avatarUrl: p.avatar_url ?? null,
     };
 
     const listings = (listingsData ?? []) as ListingRow[];
@@ -123,6 +125,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                 location={user.location}
                 listingsCount={user.listingsCount}
                 rating={user.rating}
+                avatarUrl={user.avatarUrl}
             />
 
             <UserBio bio={user.bio} />

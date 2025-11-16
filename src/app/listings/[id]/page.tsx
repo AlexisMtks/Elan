@@ -31,11 +31,12 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
       condition,
       seller_id,
       status,
-      seller:profiles!listings_seller_id_fkey (
-        id,
-        display_name,
-        listings_count
-      ),
+    seller:profiles!listings_seller_id_fkey (
+      id,
+      display_name,
+      listings_count,
+      avatar_url
+    ),
       listing_images ( image_url )
     `
         )
@@ -70,6 +71,7 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
         id: sellerRow?.id?.toString() ?? "",
         name: sellerRow?.display_name ?? "Vendeur inconnu",
         listingsCount: sellerRow?.listings_count ?? 0,
+        avatarUrl: sellerRow?.avatar_url ?? null,
     };
 
     // 2. Annonces similaires (même catégorie, autres id)
