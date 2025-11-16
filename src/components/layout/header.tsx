@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 type HeaderVariant = "default" | "search" | "compact";
@@ -27,10 +28,10 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const showSearch =
-    variant === "search" ||
-    ["/", "/research", "/messages", "/account", "/profile"].some((p) =>
-      pathname.startsWith(p),
-    );
+      variant === "search" ||
+      ["/", "/research", "/messages", "/account", "/profile"].some((p) =>
+          pathname.startsWith(p),
+      );
 
   // Déterminer si l’utilisateur est connecté
   useEffect(() => {
@@ -42,7 +43,7 @@ export function Header({ variant = "default" }: HeaderProps) {
       setIsAuthenticated(!!user);
     }
 
-    checkAuth();
+    void checkAuth();
   }, []);
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -64,65 +65,78 @@ export function Header({ variant = "default" }: HeaderProps) {
     router.push("/messages");
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
+    router.push("/login");
+  };
+
   return (
-    <header className="border-b bg-background/80">
-      <div className="mx-auto flex max-w-[1440px] items-center gap-6 px-6 py-4">
-        {/* Logo */}
-        <Link href="/" className="font-serif text-2xl">
-          Élan
-        </Link>
-
-        {/* Barre de recherche */}
-        {showSearch && (
-          <form className="flex-1" onSubmit={handleSearchSubmit}>
-            <Input
-              placeholder="Rechercher…"
-              className="rounded-full"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </form>
-        )}
-
-        <div className="flex items-center gap-3">
-          <Link href="/sell">
-            <Button>Vendre un article</Button>
+      <header className="border-b bg-background/80">
+        <div className="mx-auto flex max-w-[1440px] items-center gap-6 px-6 py-4">
+          {/* Logo */}
+          <Link href="/" className="font-serif text-2xl">
+            Élan
           </Link>
 
-          {/* Icône / menu compte */}
-          {!isAuthenticated ? (
-            // Utilisateur non connecté : lien direct vers la page de connexion
-            <Link href="/login" aria-label="Mon compte">
-              <Avatar className="h-8 w-8 cursor-pointer">
-                <AvatarFallback className="text-xs">ME</AvatarFallback>
-              </Avatar>
+          {/* Barre de recherche */}
+          {showSearch && (
+              <form className="flex-1" onSubmit={handleSearchSubmit}>
+                <Input
+                    placeholder="Rechercher…"
+                    className="rounded-full"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+              </form>
+          )}
+
+          <div className="flex items-center gap-3">
+            <Link href="/sell">
+              <Button>Vendre un article</Button>
             </Link>
-          ) : (
-            // Utilisateur connecté : menu burger / dropdown sur l’avatar
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Menu compte"
-                  className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                >
+
+            {/* Icône / menu compte */}
+            {!isAuthenticated ? (
+                // Utilisateur non connecté : lien direct vers la page de connexion
+                <Link href="/login" aria-label="Mon compte">
                   <Avatar className="h-8 w-8 cursor-pointer">
                     <AvatarFallback className="text-xs">ME</AvatarFallback>
                   </Avatar>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleGoToAccount}>
-                  Mon compte
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleGoToMessages}>
-                  Mes messages
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                </Link>
+            ) : (
+                // Utilisateur connecté : menu burger / dropdown sur l’avatar
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        aria-label="Menu compte"
+                        className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                    >
+                      <Avatar className="h-8 w-8 cursor-pointer">
+                        <AvatarFallback className="text-xs">ME</AvatarFallback>
+                      </Avatar>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleGoToAccount}>
+                      Mon compte
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleGoToMessages}>
+                      Mes messages
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        variant="destructive"
+                        onClick={handleLogout}
+                    >
+                      Se déconnecter
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
   );
 }
