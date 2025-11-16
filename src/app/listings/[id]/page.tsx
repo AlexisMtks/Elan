@@ -63,14 +63,25 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
             ? `${listing.city}, ${listing.country}`
             : listing.city ?? listing.country ?? "Localisation non précisée";
 
-    const rawSeller = listing.seller as any;
-
+    const rawSeller = listing.seller;
     const sellerRow = Array.isArray(rawSeller) ? rawSeller[0] : rawSeller;
 
+    // On calcule le nombre d'annonces actives pour ce vendeur
+    let activeListingsCount = 0;
+    if (sellerRow?.id) {
+        const { count } = await supabase
+            .from("listings")
+            .select("id", { count: "exact", head: true })
+            .eq("seller_id", sellerRow.id)
+            .eq("status", "active");
+
+        activeListingsCount = count ?? 0;
+    }
+
     const seller = {
-        id: sellerRow?.id?.toString() ?? "",
+        id: sellerRow?.id ?? "",
         name: sellerRow?.display_name ?? "Vendeur inconnu",
-        listingsCount: sellerRow?.listings_count ?? 0,
+        listingsCount: activeListingsCount,
         avatarUrl: sellerRow?.avatar_url ?? null,
     };
 
