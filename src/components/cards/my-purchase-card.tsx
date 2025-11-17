@@ -12,9 +12,12 @@ interface MyPurchaseCardProps {
     seller: string;
     date: string;
     status: PurchaseStatus;
-    imageUrl?: string; // ✅ on ajoute l'image optionnelle
+    imageUrl?: string; // ✅ nouvelle prop optionnelle pour la miniature
 }
 
+/**
+ * Carte "Mon achat" basée sur OrderCard (rôle = buyer).
+ */
 export function MyPurchaseCard({
                                    id,
                                    title,
