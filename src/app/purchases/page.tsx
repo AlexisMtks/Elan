@@ -14,6 +14,10 @@ type PurchaseStatus = "in_progress" | "delivered" | "cancelled";
 type OrderItemRow = {
   title_snapshot: string | null;
   price_snapshot: number | null;
+  listing?: {
+    id: string;
+    listing_images?: { image_url: string; position: number | null }[] | null;
+  } | null;
 };
 
 type OrderRow = {
@@ -23,6 +27,7 @@ type OrderRow = {
   total_amount: number | null;
   seller: { display_name: string }[] | null;
   order_items: OrderItemRow[] | null;
+  imageUrl?: string; // ✅ première image de l’annonce liée (si dispo)
 };
 
 function mapOrderStatusToPurchaseStatus(status: string): PurchaseStatus {
@@ -45,29 +50,66 @@ export default function MyPurchasesPage() {
       setError(null);
 
       const { data, error } = await supabase
-        .from("orders")
-        .select(
-          `
-        id,
-        created_at,
-        status,
-        total_amount,
-        seller:profiles!orders_seller_id_fkey(display_name),
-        order_items (
-          title_snapshot,
-          price_snapshot
-        )
-      `
-        )
-        .eq("buyer_id", user.id)
-        .order("created_at", { ascending: false });
+          .from("orders")
+          .select(
+              `
+          id,
+          created_at,
+          status,
+          total_amount,
+          seller:profiles!orders_seller_id_fkey ( display_name ),
+          order_items (
+            title_snapshot,
+            price_snapshot,
+            listing: listings (
+              id,
+              listing_images (
+                image_url,
+                position
+              )
+            )
+          )
+        `
+          )
+          .eq("buyer_id", user.id)
+          .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Erreur chargement achats :", error);
         setError("Impossible de charger vos achats pour le moment.");
         setOrders([]);
       } else {
-        setOrders((data ?? []) as OrderRow[]);
+        const rawOrders = (data ?? []) as any[];
+
+        const mapped: OrderRow[] = rawOrders.map((order) => {
+          const firstItem: OrderItemRow | null =
+              order.order_items?.[0] ?? null;
+
+          const listingImages =
+              firstItem?.listing?.listing_images ?? [];
+
+          let firstImage: string | undefined = undefined;
+
+          if (Array.isArray(listingImages) && listingImages.length > 0) {
+            // on trie par position croissante et on prend la première
+            const sorted = [...listingImages].sort(
+                (a, b) => (a.position ?? 0) - (b.position ?? 0)
+            );
+            firstImage = sorted[0]?.image_url;
+          }
+
+          return {
+            id: order.id,
+            created_at: order.created_at,
+            status: order.status,
+            total_amount: order.total_amount,
+            seller: order.seller,
+            order_items: order.order_items,
+            imageUrl: firstImage,
+          };
+        });
+
+        setOrders(mapped);
       }
 
       setLoading(false);
@@ -78,24 +120,24 @@ export default function MyPurchasesPage() {
 
   if (checking || loading) {
     return (
-      <div className="space-y-3">
-        <BackToAccountButton />
-        <p className="text-sm text-muted-foreground">
-          Chargement de vos achats…
-        </p>
-      </div>
+        <div className="space-y-3">
+          <BackToAccountButton />
+          <p className="text-sm text-muted-foreground">
+            Chargement de vos achats…
+          </p>
+        </div>
     );
   }
 
   // Stats pour l’overview
   const totalAmountCents = orders.reduce(
-    (sum, order) => sum + (order.total_amount ?? 0),
-    0
+      (sum, order) => sum + (order.total_amount ?? 0),
+      0
   );
   const ordersCount = orders.length;
   const averagePriceCents = ordersCount ? totalAmountCents / ordersCount : 0;
   const deliveredCount = orders.filter(
-    (order) => order.status === "delivered"
+      (order) => order.status === "delivered"
   ).length;
 
   const stats = {
@@ -106,56 +148,55 @@ export default function MyPurchasesPage() {
   };
 
   return (
-    <div className="space-y-10">
-      <BackToAccountButton />
-      <PageTitle
-        title="Mes achats"
-        subtitle="Suivez vos dépenses, vos commandes et l’historique de vos achats."
-      />
+      <div className="space-y-10">
+        <BackToAccountButton />
+        <PageTitle
+            title="Mes achats"
+            subtitle="Suivez vos dépenses, vos commandes et l’historique de vos achats."
+        />
 
-      <PurchasesOverview stats={stats} />
+        <PurchasesOverview stats={stats} />
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Historique de mes achats</h2>
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold">Historique de mes achats</h2>
 
-        {error && (
-          <p className="text-sm text-red-600">{error}</p>
-        )}
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
-        {orders.length === 0 && !error ? (
-          <p className="text-sm text-muted-foreground">
-            Vous n’avez pas encore effectué d’achat.
-          </p>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {orders.map((order) => {
-              const firstItem = order.order_items?.[0] ?? null;
-              const title =
-                firstItem?.title_snapshot ?? `Commande #${order.id}`;
-              const priceCents =
-                order.total_amount ?? firstItem?.price_snapshot ?? 0;
-              const sellerName =
-                order.seller?.[0]?.display_name ?? "Vendeur inconnu";
-              const date = new Date(order.created_at).toLocaleDateString(
-                "fr-FR"
-              );
-              const status = mapOrderStatusToPurchaseStatus(order.status);
+          {orders.length === 0 && !error ? (
+              <p className="text-sm text-muted-foreground">
+                Vous n’avez pas encore effectué d’achat.
+              </p>
+          ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {orders.map((order) => {
+                  const firstItem = order.order_items?.[0] ?? null;
+                  const title =
+                      firstItem?.title_snapshot ?? `Commande #${order.id}`;
+                  const priceCents =
+                      order.total_amount ?? firstItem?.price_snapshot ?? 0;
+                  const sellerName =
+                      order.seller?.[0]?.display_name ?? "Vendeur inconnu";
+                  const date = new Date(order.created_at).toLocaleDateString(
+                      "fr-FR"
+                  );
+                  const status = mapOrderStatusToPurchaseStatus(order.status);
 
-              return (
-                <MyPurchaseCard
-                  key={order.id}
-                  id={order.id.toString()}
-                  title={title}
-                  price={priceCents / 100}
-                  seller={sellerName}
-                  date={date}
-                  status={status}
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
-    </div>
+                  return (
+                      <MyPurchaseCard
+                          key={order.id}
+                          id={order.id.toString()}
+                          title={title}
+                          price={priceCents / 100}
+                          seller={sellerName}
+                          date={date}
+                          status={status}
+                          imageUrl={order.imageUrl} // ✅ on passe la première image à la card
+                      />
+                  );
+                })}
+              </div>
+          )}
+        </section>
+      </div>
   );
 }

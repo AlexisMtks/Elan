@@ -13,6 +13,7 @@ interface MyListingCardProps {
     price: number;
     location: string;
     status: ListingStatus;
+    imageUrl?: string;
 }
 
 export function MyListingCard({
@@ -21,6 +22,7 @@ export function MyListingCard({
                                   price,
                                   location,
                                   status,
+                                  imageUrl,
                               }: MyListingCardProps) {
     const router = useRouter();
 
@@ -55,6 +57,7 @@ export function MyListingCard({
             location={location}
             variant="default"
             clickable={false} // désactive la navigation sur cette variante
+            imageUrl={imageUrl}
             footer={
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <Badge variant={statusVariant as any}>{statusLabel}</Badge>

@@ -28,6 +28,7 @@ type ListingRow = {
     title: string;
     price: number; // centimes
     city: string | null;
+    imageUrl?: string;
 };
 
 const CATEGORY_LABELS: Record<Exclude<CategoryValue, "all">, string> = {
@@ -143,17 +144,32 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     // ----------------------------
     // 2) Requête Supabase
     // ----------------------------
+    // ----------------------------
+// 2) Requête Supabase
+// ----------------------------
     let supaQuery = supabase
         .from("listings")
-        .select("id, title, price, city", { count: "exact" })
+        .select(
+            `
+        id,
+        title,
+        price,
+        city,
+        listing_images (
+          image_url,
+          position
+        )
+      `,
+            { count: "exact" },
+        )
         .eq("status", "active");
 
-    // Recherche texte
+// Recherche texte
     if (query) {
         supaQuery = supaQuery.ilike("title", `%${query}%`);
     }
 
-    // Catégorie (via category_id, basé sur les seeds)
+// Catégorie (via category_id, basé sur les seeds)
     if (category !== "all") {
         const categoryId = CATEGORY_ID_BY_SLUG[category as Exclude<CategoryValue, "all">];
         if (categoryId) {
@@ -161,7 +177,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         }
     }
 
-    // Prix (en centimes en base)
+// Prix (en centimes en base)
     if (minPrice !== undefined) {
         supaQuery = supaQuery.gte("price", minPrice * 100);
     }
@@ -169,25 +185,43 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         supaQuery = supaQuery.lte("price", maxPrice * 100);
     }
 
-    // Conditions (in sur la colonne listings.condition)
+// Conditions (in sur la colonne listings.condition)
     if (conditions.length > 0) {
         supaQuery = supaQuery.in("condition", conditions);
     }
 
-    // Ville
+// Ville
     if (city) {
         supaQuery = supaQuery.ilike("city", `${city}%`);
     }
 
-    // Négociable (listings.is_negotiable)
+// Négociable (listings.is_negotiable)
     if (negotiable === "yes") {
         supaQuery = supaQuery.eq("is_negotiable", true);
     } else if (negotiable === "no") {
         supaQuery = supaQuery.eq("is_negotiable", false);
     }
 
-    const { data, error, count } = await supaQuery;
-    const listings = (data ?? []) as ListingRow[];
+// On récupère les données en ne gardant qu'une image par annonce (la première par position)
+    const { data, error, count } = await supaQuery
+        .order("position", { foreignTable: "listing_images", ascending: true })
+        .limit(1, { foreignTable: "listing_images" });
+
+    const listings: ListingRow[] = (data ?? []).map((row: any) => {
+        const firstImage =
+            Array.isArray(row.listing_images) && row.listing_images.length > 0
+                ? row.listing_images[0].image_url
+                : undefined;
+
+        return {
+            id: row.id,
+            title: row.title,
+            price: row.price,
+            city: row.city,
+            imageUrl: firstImage,
+        };
+    });
+
     const total = count ?? listings.length;
 
     const title = query
@@ -233,6 +267,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                                 price={p.price / 100}
                                 location={p.city ?? undefined}
                                 variant="compact"
+                                imageUrl={p.imageUrl}
                             />
                         ))}
                     </div>

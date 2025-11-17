@@ -16,6 +16,7 @@ interface OrderCardProps {
     date: string;
     status: OrderStatus;
     role: OrderRole;
+    imageUrl?: string; // ✅ miniature de l'annonce (optionnelle)
 }
 
 /**
@@ -32,6 +33,7 @@ export function OrderCard({
                               date,
                               status,
                               role,
+                              imageUrl,
                           }: OrderCardProps) {
     const counterpartLabel = role === "buyer" ? "Vendeur" : "Acheteur";
 
@@ -47,11 +49,22 @@ export function OrderCard({
     };
 
     return (
-        <Card className="rounded-2xl border text-sm w-full max-w-sm">
+        <Card className="w-full max-w-sm rounded-2xl border text-sm">
             <div className="flex gap-3 p-3 sm:p-4">
                 <Link href={`/orders/${id}`} className="flex flex-1 gap-3">
-                    <div className="hidden h-20 w-20 items-center justify-center rounded-lg bg-muted text-[11px] text-muted-foreground sm:flex">
-                        Image
+                    {/* Vignette image */}
+                    <div className="hidden h-20 w-20 overflow-hidden rounded-lg bg-muted sm:flex">
+                        {imageUrl ? (
+                            <img
+                                src={imageUrl}
+                                alt={title}
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            <div className="flex h-full w-full items-center justify-center text-[11px] text-muted-foreground">
+                                Photo
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-1 flex-col gap-1">
@@ -71,16 +84,16 @@ export function OrderCard({
 
             {/* Footer : statut + date + bouton en colonne */}
             <div className="flex flex-col border-t px-3 py-2.5 sm:px-4">
-        <span className="text-xs text-muted-foreground mb-1">
-          Statut : {statusLabel} • {date}
-        </span>
+                <span className="mb-1 text-xs text-muted-foreground">
+                    Statut : {statusLabel} • {date}
+                </span>
 
                 {status === "in_progress" && (
                     <Button
                         type="button"
                         variant="link"
                         size="sm"
-                        className="px-0 text-xs self-start"
+                        className="self-start px-0 text-xs"
                         onClick={handleTrackOrder}
                     >
                         Suivre la commande
