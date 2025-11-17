@@ -2,19 +2,19 @@
 
 import { OrderCard, OrderStatus } from "@/components/cards/order-card";
 
+export type SaleStatus = OrderStatus;
+
 interface MySaleCardProps {
-    id: string; // identifiant de la commande / vente
+    id: string;
     title: string;
     price: number;
     location?: string;
     buyer: string;
     date: string;
-    status: OrderStatus;
+    status: SaleStatus;
+    imageUrl?: string; // ✅ nouvelle prop optionnelle
 }
 
-/**
- * Variante "Mes ventes" basée sur OrderCard (role="seller").
- */
 export function MySaleCard({
                                id,
                                title,
@@ -23,6 +23,7 @@ export function MySaleCard({
                                buyer,
                                date,
                                status,
+                               imageUrl,
                            }: MySaleCardProps) {
     return (
         <OrderCard
@@ -34,6 +35,7 @@ export function MySaleCard({
             date={date}
             status={status}
             role="seller"
+            imageUrl={imageUrl} // ✅ on transmet à OrderCard
         />
     );
 }

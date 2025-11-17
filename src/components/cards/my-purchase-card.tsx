@@ -2,19 +2,19 @@
 
 import { OrderCard, OrderStatus } from "@/components/cards/order-card";
 
+export type PurchaseStatus = OrderStatus;
+
 interface MyPurchaseCardProps {
-    id: string; // identifiant de la commande
+    id: string;
     title: string;
     price: number;
     location?: string;
     seller: string;
     date: string;
-    status: OrderStatus;
+    status: PurchaseStatus;
+    imageUrl?: string; // ✅ on ajoute l'image optionnelle
 }
 
-/**
- * Variante "Mes achats" basée sur OrderCard (role="buyer").
- */
 export function MyPurchaseCard({
                                    id,
                                    title,
@@ -23,6 +23,7 @@ export function MyPurchaseCard({
                                    seller,
                                    date,
                                    status,
+                                   imageUrl,
                                }: MyPurchaseCardProps) {
     return (
         <OrderCard
@@ -34,6 +35,7 @@ export function MyPurchaseCard({
             date={date}
             status={status}
             role="buyer"
+            imageUrl={imageUrl} // ✅ on transmet à OrderCard
         />
     );
 }
