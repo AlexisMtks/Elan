@@ -5,18 +5,15 @@ import { Button } from "@/components/ui/button";
 export function ListingActions() {
     return (
         <div className="flex flex-wrap gap-3">
-        <Button
-            onClick={() => alert("Simulation: buy this item")}
->
-    Buy
-    </Button>
-
-    <Button
-    variant="outline"
-    onClick={() => alert("Simulation: make an offer")}
->
-    Make an offer
-    </Button>
-    </div>
-);
+            <Button onClick={() => alert("Simulation : achat de l'annonce")}>
+                Acheter
+            </Button>
+            <Button
+                variant="outline"
+                onClick={() => alert("Simulation : faire une offre")}
+            >
+                Faire une offre
+            </Button>
+        </div>
+    );
 }

@@ -1,8 +1,7 @@
-import { PageTitle } from "@/components/misc/page-title";
 import { ProductGallery } from "@/components/listing/product-gallery";
 import { TechnicalDetails } from "@/components/listing/technical-details";
 import { ProductCarousel } from "@/components/carousels/product-carousel";
-import { ListingActions } from "@/components/listing/listing-actions";
+import { Card } from "@/components/ui/card";
 import { supabase } from "@/lib/supabaseClient";
 
 interface ListingDetailPageProps {
@@ -14,31 +13,33 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
     const { id } = await params;
     const listingId = id;
 
-    // 1. Récupération de l’annonce + vendeur + images
+    // --- Récupération de l'annonce + images + vendeur ---
     const { data: listing, error: listingError } = await supabase
         .from("listings")
         .select(
             `
-      id,
-      title,
-      description,
-      price,
-      city,
-      country,
-      category_id,
-      brand,
-      size,
-      condition,
-      seller_id,
-      status,
-    seller:profiles!listings_seller_id_fkey (
-      id,
-      display_name,
-      listings_count,
-      avatar_url
-    ),
-      listing_images ( image_url )
-    `
+        id,
+        title,
+        description,
+        price,
+        currency,
+        status,
+        category_id,
+        brand,
+        condition,
+        size,
+        city,
+        country,
+        shipping_time,
+        is_negotiable,
+        seller:profiles!listings_seller_id_fkey (
+          id,
+          display_name,
+          listings_count,
+          avatar_url
+        ),
+        listing_images ( image_url )
+      `
         )
         .eq("id", listingId)
         .single();
@@ -79,7 +80,7 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
 
     const seller = {
         id: sellerRow?.id ?? "",
-        name: sellerRow?.display_name ?? "Vendeur inconnu",
+        name: sellerRow?.display_name ?? "Vendeur",
         listingsCount: activeListingsCount,
         avatarUrl: sellerRow?.avatar_url ?? null,
     };
@@ -101,9 +102,9 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
     }));
 
     return (
-        <div className="mx-auto w-full max-w-6xl space-y-10 px-4 py-6 lg:py-8">
-            {/* Top: galerie + résumé */}
-            <section className="grid gap-10 items-start lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
+        <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-3 lg:py-0">
+            {/* Top: galerie + détails */}
+            <section className="grid items-start gap-10 lg:grid-cols-[minmax(0,1.6fr)_minmax(360px,1fr)] xl:gap-12">
                 {/* Colonne image */}
                 <div className="flex justify-center lg:justify-start">
                     <div className="w-full max-w-[720px]">
@@ -112,23 +113,11 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
                 </div>
 
                 {/* Colonne droite */}
-                <div className="w-full lg:max-w-sm lg:ml-auto space-y-6">
-                    <div className="space-y-4">
-                        <PageTitle title={listing.title} />
-                        <p className="text-3xl font-semibold">
-                            {listing.price / 100} €
-                        </p>
-
-                        {/* Boutons client */}
-                        <ListingActions />
-
-                        <p className="text-sm text-muted-foreground">
-                            {location}
-                        </p>
-                    </div>
-
+                <div className="w-full lg:ml-auto lg:max-w-md xl:max-w-lg">
                     <TechnicalDetails
                         seller={seller}
+                        title={listing.title}
+                        price={listing.price / 100}
                         category={listing.category_id?.toString() ?? "-"}
                         brand={listing.brand ?? "-"}
                         size={listing.size ?? "-"}
@@ -139,12 +128,14 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
             </section>
 
             {/* Description */}
-            <section className="space-y-3">
-                <h2 className="text-lg font-semibold">Description</h2>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                    {listing.description ??
-                        "Aucune description n’a été fournie pour cette annonce."}
-                </p>
+            <section>
+                <Card className="rounded-2xl border p-5">
+                    <h2 className="text-lg font-semibold">Description</h2>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                        {listing.description ??
+                            "Aucune description n’a été fournie pour cette annonce."}
+                    </p>
+                </Card>
             </section>
 
             {/* Produits similaires */}

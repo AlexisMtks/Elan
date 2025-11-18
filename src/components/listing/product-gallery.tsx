@@ -12,7 +12,7 @@ export function ProductGallery({ images }: ProductGalleryProps) {
     return (
         <div className="space-y-4">
             {/* Image principale */}
-            <Card className="aspect-[4/3] w-full overflow-hidden rounded-2xl bg-muted">
+            <Card className="aspect-[4/3] w-full overflow-hidden rounded-2xl bg-muted max-h-[470px]">
                 {mainImage ? (
                     <img
                         src={mainImage}
