@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useRef, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { AvatarImage } from "@radix-ui/react-avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type Gender = "female" | "male" | "other" | "unspecified";
 
@@ -27,7 +26,6 @@ interface AccountFormValues {
   city: string;
   country: string;
   gender: Gender;
-  avatarFile?: File | null;
 }
 
 interface AccountFormProps {
@@ -52,14 +50,11 @@ interface AccountFormProps {
   };
   onSubmit?: (values: AccountFormValues) => Promise<void> | void;
   onChangePasswordClick?: () => void;
+  onAvatarFileSelected?: (file: File | null) => void;
 }
 
-export function AccountForm({ profile, email, address, onSubmit, onChangePasswordClick}: AccountFormProps) {
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+export function AccountForm({ profile, email, address, onSubmit, onChangePasswordClick, onAvatarFileSelected,}: AccountFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(
-      profile.avatarUrl ?? null,
-  );
   const [gender, setGender] = useState<Gender>(
       (profile.gender as Gender) || "unspecified",
   );
@@ -87,7 +82,6 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
       city: (formData.get("city") as string) ?? "",
       country: (formData.get("country") as string) ?? "",
       gender,
-      avatarFile,
     };
 
     try {
@@ -102,29 +96,32 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
     fileInputRef.current?.click();
   };
 
-  const handleAvatarFileChange = (
-      event: ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Preview immédiate côté client
-    const previewUrl = URL.createObjectURL(file);
-    setAvatarPreview(previewUrl);
-    setAvatarFile(file);
-  };
+// Toujours avoir un libellé de base pour générer des initiales
+  const displayLabel =
+      profile.displayName?.trim() ||
+      email?.trim() ||
+      "Elan utilisateur";
 
   const initials =
-      (profile.displayName || "")
+      displayLabel
           .split(" ")
-          .map((n) => n[0])
+          .filter(Boolean)
+          .map((part) => part[0])
+          .slice(0, 2)
           .join("")
-          .toUpperCase() || "EL";
+          .toUpperCase();
 
-  const defaultGender: Gender =
-      (profile.gender as Gender) || "unspecified";
+  // const defaultGender: Gender =
+  //     (profile.gender as Gender) || "unspecified";
 
-  const currentAvatarUrl = avatarPreview ?? profile.avatarUrl ?? undefined;
+  const rawAvatarUrl = profile.avatarUrl ?? undefined;
+
+  const safeAvatarUrl =
+      typeof rawAvatarUrl === "string" &&
+      rawAvatarUrl.trim() !== "" &&
+      !["null", "undefined"].includes(rawAvatarUrl.trim().toLowerCase())
+          ? rawAvatarUrl.trim()
+          : undefined;
 
   return (
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -146,11 +143,8 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
                 aria-label="Modifier la photo de profil"
             >
               <Avatar className="h-16 w-16">
-                {currentAvatarUrl ? (
-                    <AvatarImage src={currentAvatarUrl} alt={profile.displayName} />
-                ) : (
-                    <AvatarFallback>{initials}</AvatarFallback>
-                )}
+                <AvatarImage src={safeAvatarUrl} alt={displayLabel} />
+                <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
 
               <div className="pointer-events-none absolute inset-0 rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100" />
@@ -168,7 +162,13 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={handleAvatarFileChange}
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+
+                  if (onAvatarFileSelected) {
+                    onAvatarFileSelected(file);
+                  }
+                }}
             />
           </div>
         </div>

@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { AppModal } from "@/components/modals/app-modal";
 import { changePassword } from "@/lib/auth/changePassword";
 import Link from "next/link";
+import { AvatarCropperDialog } from "@/components/avatar/avatar-cropper-dialog";
 
 type Stats = {
     listings: number;
@@ -49,7 +50,6 @@ type AccountFormValues = {
     city: string;
     country: string;
     gender: "female" | "male" | "other" | "unspecified";
-    avatarFile?: File | null;
 };
 
 export function AccountPageClient() {
@@ -65,6 +65,21 @@ export function AccountPageClient() {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
     const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+
+    // 🔹 États pour le recadrage d'avatar
+    const [rawAvatarFile, setRawAvatarFile] = useState<File | null>(null);
+    const [croppedAvatarBlob, setCroppedAvatarBlob] = useState<Blob | null>(null);
+    const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+    const [avatarCropperOpen, setAvatarCropperOpen] = useState(false);
+
+    // Nettoyage de l'URL de prévisualisation à l'unmount
+    useEffect(() => {
+        return () => {
+            if (avatarPreviewUrl) {
+                URL.revokeObjectURL(avatarPreviewUrl);
+            }
+        };
+    }, [avatarPreviewUrl]);
 
     useEffect(() => {
         const load = async () => {
@@ -107,7 +122,6 @@ export function AccountPageClient() {
                         .from("addresses")
                         .select("line1, line2, city, postcode, country")
                         .eq("user_id", user.id)
-                        // .order("created_at", { ascending: false })
                         .limit(1)
                         .maybeSingle(),
                 ]);
@@ -160,44 +174,34 @@ export function AccountPageClient() {
         load();
     }, []);
 
-    // Callback passé au formulaire pour uploader l'avatar
-    const handleAvatarChange = async (file: File) => {
-        if (!userId) return;
-
-        try {
-            setErrorMsg(null);
-
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("userId", userId);
-
-            const res = await fetch("/api/account/avatar", {
-                method: "POST",
-                body: formData,
-            });
-
-            const data = await res.json().catch(() => null);
-
-            if (!res.ok) {
-                console.error("Avatar upload API error:", data);
-                setErrorMsg(
-                    data?.error ?? "Erreur lors de l’upload de la photo de profil.",
-                );
-                return;
+    // 🔹 Quand l'utilisateur choisit un nouveau fichier avatar (depuis AccountForm)
+    const handleAvatarFileSelected = (file: File | null) => {
+        if (!file) {
+            setRawAvatarFile(null);
+            setCroppedAvatarBlob(null);
+            if (avatarPreviewUrl) {
+                URL.revokeObjectURL(avatarPreviewUrl);
+                setAvatarPreviewUrl(null);
             }
-
-            setProfile((prev) =>
-                prev
-                    ? {
-                        ...prev,
-                        avatar_url: data.publicUrl,
-                    }
-                    : prev,
-            );
-        } catch (err) {
-            console.error("Erreur upload avatar (client):", err);
-            setErrorMsg("Erreur lors de l’upload de la photo de profil.");
+            return;
         }
+
+        setRawAvatarFile(file);
+        setAvatarCropperOpen(true);
+    };
+
+    // 🔹 Quand le recadrage est validé dans le modal
+    const handleAvatarCropped = (blob: Blob) => {
+        setCroppedAvatarBlob(blob);
+
+        // On met à jour l’aperçu local
+        const url = URL.createObjectURL(blob);
+        setAvatarPreviewUrl((prev) => {
+            if (prev) {
+                URL.revokeObjectURL(prev);
+            }
+            return url;
+        });
     };
 
     const handleAccountSubmit = async (values: AccountFormValues) => {
@@ -301,11 +305,16 @@ export function AccountPageClient() {
             });
         }
 
-        // 4. Upload de la nouvelle photo de profil si présente
-        if (values.avatarFile) {
+        // 4. Upload de la nouvelle photo de profil
+        //    -> priorité au fichier recadré, sinon fallback sur avatarFile existant
+        const avatarFileToUpload = croppedAvatarBlob
+            ? new File([croppedAvatarBlob], "avatar.jpg", { type: "image/jpeg" })
+            : null;
+
+        if (avatarFileToUpload) {
             try {
                 const formData = new FormData();
-                formData.append("file", values.avatarFile);
+                formData.append("file", avatarFileToUpload);
                 formData.append("userId", userId);
 
                 const res = await fetch("/api/account/avatar", {
@@ -348,6 +357,13 @@ export function AccountPageClient() {
                         }),
                     );
                 }
+
+                // reset du blob recadré après upload réussi
+                setCroppedAvatarBlob(null);
+                if (avatarPreviewUrl) {
+                    URL.revokeObjectURL(avatarPreviewUrl);
+                    setAvatarPreviewUrl(null);
+                }
             } catch (err) {
                 console.error("Erreur upload avatar (client):", err);
                 setErrorMsg("Erreur lors de l’upload de la photo de profil.");
@@ -389,47 +405,59 @@ export function AccountPageClient() {
         "Utilisateur Élan";
 
     return (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-            <Card className="rounded-2xl border p-6">
-                <AccountForm
-                    profile={{
-                        username: profile.username,
-                        firstName: profile.first_name,
-                        lastName: profile.last_name,
-                        displayName,
-                        city: profile.city,
-                        country: profile.country,
-                        avatarUrl: profile.avatar_url,
-                        bio: profile.bio,
-                        phoneNumber: profile.phone_number,
-                        gender: profile.gender,
+        <>
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+                <Card className="rounded-2xl border p-6">
+                    <AccountForm
+                        profile={{
+                            username: profile.username,
+                            firstName: profile.first_name,
+                            lastName: profile.last_name,
+                            displayName,
+                            city: profile.city,
+                            country: profile.country,
+                            // si un nouvel avatar a été recadré, on l’utilise pour l’aperçu
+                            avatarUrl: avatarPreviewUrl ?? profile.avatar_url,
+                            bio: profile.bio,
+                            phoneNumber: profile.phone_number,
+                            gender: profile.gender,
+                        }}
+                        email={email}
+                        address={{
+                            line1: address?.line1 ?? null,
+                            postcode: address?.postcode ?? null,
+                            city: address?.city ?? profile.city ?? null,
+                            country: address?.country ?? profile.country ?? null,
+                        }}
+                        onSubmit={handleAccountSubmit}
+                        onChangePasswordClick={() => setPasswordModalOpen(true)}
+                        // 🔹 nouvelle prop pour remonter le fichier brut
+                        onAvatarFileSelected={handleAvatarFileSelected}
+                    />
+                </Card>
+
+                <Card className="rounded-2xl border p-6">
+                    <AccountActivity stats={stats} />
+                </Card>
+
+                {/* ✅ MODAL CHANGEMENT MOT DE PASSE */}
+                <AppModal
+                    variant="change-password"
+                    open={passwordModalOpen}
+                    onOpenChange={setPasswordModalOpen}
+                    onSubmit={async ({ currentPassword, newPassword }) => {
+                        await changePassword(currentPassword, newPassword);
                     }}
-                    email={email}
-                    address={{
-                        line1: address?.line1 ?? null,
-                        postcode: address?.postcode ?? null,
-                        city: address?.city ?? profile.city ?? null,
-                        country: address?.country ?? profile.country ?? null,
-                    }}
-                    onSubmit={handleAccountSubmit}
-                    // ✅ NOUVELLE PROP :
-                    onChangePasswordClick={() => setPasswordModalOpen(true)}
                 />
-            </Card>
+            </div>
 
-            <Card className="rounded-2xl border p-6">
-                <AccountActivity stats={stats} />
-            </Card>
-
-            {/* ✅ MODAL CHANGEMENT MOT DE PASSE */}
-            <AppModal
-                variant="change-password"
-                open={passwordModalOpen}
-                onOpenChange={setPasswordModalOpen}
-                onSubmit={async ({ currentPassword, newPassword }) => {
-                    await changePassword(currentPassword, newPassword);
-                }}
+            {/* 🔹 Modal de recadrage d’avatar */}
+            <AvatarCropperDialog
+                open={avatarCropperOpen}
+                onOpenChange={setAvatarCropperOpen}
+                file={rawAvatarFile}
+                onCropped={handleAvatarCropped}
             />
-        </div>
+        </>
     );
 }
