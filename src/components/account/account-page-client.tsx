@@ -6,6 +6,8 @@ import { AccountForm } from "@/components/account/account-form";
 import { AccountActivity } from "@/components/account/account-activity";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AppModal } from "@/components/modals/app-modal";
+import { changePassword } from "@/lib/auth/changePassword";
 import Link from "next/link";
 
 type Stats = {
@@ -62,6 +64,7 @@ export function AccountPageClient() {
     const [email, setEmail] = useState<string>("");
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
+    const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
     useEffect(() => {
         const load = async () => {
@@ -409,12 +412,28 @@ export function AccountPageClient() {
                         country: address?.country ?? profile.country ?? null,
                     }}
                     onSubmit={handleAccountSubmit}
+                    // ✅ NOUVELLE PROP :
+                    onChangePasswordClick={() => setPasswordModalOpen(true)}
                 />
             </Card>
 
             <Card className="rounded-2xl border p-6">
                 <AccountActivity stats={stats} />
             </Card>
+
+            <Card className="rounded-2xl border p-6">
+                <AccountActivity stats={stats} />
+            </Card>
+
+            {/* ✅ MODAL CHANGEMENT MOT DE PASSE */}
+            <AppModal
+                variant="change-password"
+                open={passwordModalOpen}
+                onOpenChange={setPasswordModalOpen}
+                onSubmit={async ({ currentPassword, newPassword }) => {
+                    await changePassword(currentPassword, newPassword);
+                }}
+            />
         </div>
     );
 }

@@ -51,9 +51,10 @@ interface AccountFormProps {
     country?: string | null;
   };
   onSubmit?: (values: AccountFormValues) => Promise<void> | void;
+  onChangePasswordClick?: () => void;
 }
 
-export function AccountForm({ profile, email, address, onSubmit }: AccountFormProps) {
+export function AccountForm({ profile, email, address, onSubmit, onChangePasswordClick}: AccountFormProps) {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(
@@ -289,7 +290,10 @@ export function AccountForm({ profile, email, address, onSubmit }: AccountFormPr
           <Button
               type="button"
               variant="outline"
-              onClick={() => alert("Simulation : changement de mot de passe.")}
+              onClick={
+                  onChangePasswordClick ??
+                  (() => alert("Simulation : changement de mot de passe."))
+              }
           >
             Modifier le mot de passe
           </Button>
