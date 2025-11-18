@@ -421,10 +421,6 @@ export function AccountPageClient() {
                 <AccountActivity stats={stats} />
             </Card>
 
-            <Card className="rounded-2xl border p-6">
-                <AccountActivity stats={stats} />
-            </Card>
-
             {/* ✅ MODAL CHANGEMENT MOT DE PASSE */}
             <AppModal
                 variant="change-password"
