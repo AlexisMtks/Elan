@@ -119,7 +119,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     }));
 
     return (
-        <div className="space-y-10">
+        <div className="space-y-2">
             <UserHeader
                 name={user.name}
                 location={user.location}
@@ -130,7 +130,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
             <UserBio bio={user.bio} />
 
-            <ProductCarousel title="Annonces actives" items={carouselItems} />
+            <ProductCarousel title="Annonces publiées" items={carouselItems} />
 
             <ReviewsCarousel title="Avis des acheteurs" reviews={reviewItems} />
         </div>

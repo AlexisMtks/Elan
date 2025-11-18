@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card"; // 👈 importer Card
 import { Star } from "lucide-react";
 
 interface UserHeaderProps {
@@ -33,7 +34,7 @@ export function UserHeader({
     };
 
     return (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border p-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+        <Card className="flex flex-col items-center gap-4 rounded-2xl p-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
             <div className="flex items-center gap-4">
                 <Avatar className="h-14 w-14">
                     {avatarUrl ? (
@@ -42,6 +43,7 @@ export function UserHeader({
                         <AvatarFallback>{initials}</AvatarFallback>
                     )}
                 </Avatar>
+
                 <div>
                     <h1 className="text-xl font-semibold">{name}</h1>
                     <p className="text-sm text-muted-foreground">{location}</p>
@@ -78,6 +80,6 @@ export function UserHeader({
                     Contacter
                 </Button>
             </div>
-        </div>
+        </Card>
     );
 }
