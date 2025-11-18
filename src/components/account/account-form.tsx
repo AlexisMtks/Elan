@@ -94,7 +94,7 @@ export function AccountForm({ profile, email, address, onAvatarChange }: Account
   const currentAvatarUrl = avatarPreview ?? profile.avatarUrl ?? undefined;
 
   return (
-      <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl border p-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* En-tête + avatar */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">

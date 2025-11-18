@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { uploadAvatarImage } from "@/lib/imageUpload";
 import { AccountForm } from "@/components/account/account-form";
 import { AccountActivity } from "@/components/account/account-activity";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import Link from "next/link";
 
 type Stats = {
@@ -216,30 +216,35 @@ export function AccountPageClient() {
         "Utilisateur Élan";
 
     return (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <AccountForm
-                profile={{
-                    username: profile.username,
-                    firstName: profile.first_name,
-                    lastName: profile.last_name,
-                    displayName,
-                    city: profile.city,
-                    country: profile.country,
-                    avatarUrl: profile.avatar_url,
-                    bio: profile.bio,
-                    phoneNumber: profile.phone_number,
-                    gender: profile.gender,
-                }}
-                email={email}
-                address={{
-                    line1: address?.line1 ?? null,
-                    postcode: address?.postcode ?? null,
-                    city: address?.city ?? profile.city ?? null,
-                    country: address?.country ?? profile.country ?? null,
-                }}
-                onAvatarChange={handleAvatarChange}
-            />
-            <AccountActivity stats={stats} />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+            <Card className="rounded-2xl border p-6">
+                <AccountForm
+                    profile={{
+                        username: profile.username,
+                        firstName: profile.first_name,
+                        lastName: profile.last_name,
+                        displayName,
+                        city: profile.city,
+                        country: profile.country,
+                        avatarUrl: profile.avatar_url,
+                        bio: profile.bio,
+                        phoneNumber: profile.phone_number,
+                        gender: profile.gender,
+                    }}
+                    email={email}
+                    address={{
+                        line1: address?.line1 ?? null,
+                        postcode: address?.postcode ?? null,
+                        city: address?.city ?? profile.city ?? null,
+                        country: address?.country ?? profile.country ?? null,
+                    }}
+                    onAvatarChange={handleAvatarChange}
+                />
+            </Card>
+
+            <Card className="rounded-2xl border p-6">
+                <AccountActivity stats={stats} />
+            </Card>
         </div>
     );
 }

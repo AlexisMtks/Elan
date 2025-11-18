@@ -4,7 +4,7 @@ import { AccountHeader } from "@/components/account/account-header";
 
 export default function AccountPage() {
     return (
-        <div className="space-y-10">
+        <div className="space-y-3">
             <AccountHeader />
             <AccountPageClient />
         </div>
