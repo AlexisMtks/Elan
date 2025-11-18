@@ -16,6 +16,20 @@ import { AvatarImage } from "@radix-ui/react-avatar";
 
 type Gender = "female" | "male" | "other" | "unspecified";
 
+interface AccountFormValues {
+  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  addressLine1: string;
+  postcode: string;
+  city: string;
+  country: string;
+  gender: Gender;
+  avatarFile?: File | null;
+}
+
 interface AccountFormProps {
   profile: {
     username?: string | null;
@@ -36,32 +50,58 @@ interface AccountFormProps {
     city?: string | null;
     country?: string | null;
   };
-  onAvatarChange?: (file: File) => Promise<void> | void;
+  onSubmit?: (values: AccountFormValues) => Promise<void> | void;
 }
 
-export function AccountForm({ profile, email, address, onAvatarChange }: AccountFormProps) {
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+export function AccountForm({ profile, email, address, onSubmit }: AccountFormProps) {
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(
-      profile.avatarUrl ?? null
+      profile.avatarUrl ?? null,
+  );
+  const [gender, setGender] = useState<Gender>(
+      (profile.gender as Gender) || "unspecified",
   );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // TODO: patch profils + adresse (Supabase) — ici on reste en simulation
-    alert("Simulation : les informations du compte ont été enregistrées.");
-  };
 
-  // ❌ on supprime l’ancien handleChangeAvatar() qui faisait juste un alert
-  // const handleChangeAvatar = () => {
-  //   alert("Simulation : modification de la photo de profil.");
-  // };
+    if (!onSubmit) {
+      // Fallback si jamais onSubmit n'est pas fourni
+      alert("Simulation : les informations du compte ont été enregistrées.");
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+
+    const values: AccountFormValues = {
+      username: (formData.get("username") as string) ?? "",
+      email: (formData.get("email") as string) ?? "",
+      firstName: (formData.get("firstName") as string) ?? "",
+      lastName: (formData.get("lastName") as string) ?? "",
+      phone: (formData.get("phone") as string) ?? "",
+      addressLine1: (formData.get("address") as string) ?? "",
+      postcode: (formData.get("postcode") as string) ?? "",
+      city: (formData.get("city") as string) ?? "",
+      country: (formData.get("country") as string) ?? "",
+      gender,
+      avatarFile,
+    };
+
+    try {
+      setIsSubmitting(true);
+      await onSubmit(values);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleClickAvatar = () => {
     fileInputRef.current?.click();
   };
 
-  const handleAvatarFileChange = async (
+  const handleAvatarFileChange = (
       event: ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
@@ -70,15 +110,7 @@ export function AccountForm({ profile, email, address, onAvatarChange }: Account
     // Preview immédiate côté client
     const previewUrl = URL.createObjectURL(file);
     setAvatarPreview(previewUrl);
-
-    if (!onAvatarChange) return;
-
-    try {
-      setIsUploadingAvatar(true);
-      await onAvatarChange(file);
-    } finally {
-      setIsUploadingAvatar(false);
-    }
+    setAvatarFile(file);
   };
 
   const initials =
@@ -122,7 +154,7 @@ export function AccountForm({ profile, email, address, onAvatarChange }: Account
 
               <div className="pointer-events-none absolute inset-0 rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100" />
 
-              {isUploadingAvatar && (
+              {isSubmitting  && (
                   <span className="absolute inset-0 flex items-center justify-center rounded-full text-xs text-white">
         …
       </span>
@@ -192,7 +224,7 @@ export function AccountForm({ profile, email, address, onAvatarChange }: Account
           {/* Genre */}
           <div className="space-y-2">
             <Label htmlFor="gender">Genre</Label>
-            <Select defaultValue={defaultGender}>
+            <Select value={gender} onValueChange={(value) => setGender(value as Gender)}>
               <SelectTrigger id="gender">
                 <SelectValue placeholder="Sélectionner" />
               </SelectTrigger>
@@ -251,7 +283,9 @@ export function AccountForm({ profile, email, address, onAvatarChange }: Account
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Button type="submit">Enregistrer les modifications</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Enregistrement..." : "Enregistrer les modifications"}
+          </Button>
           <Button
               type="button"
               variant="outline"

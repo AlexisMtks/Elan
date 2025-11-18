@@ -25,11 +25,11 @@ interface HeaderProps {
 
 const getInitials = (name: string): string => {
   return name
-    .split(" ")
-    .filter((part: string) => part.trim().length > 0)
-    .map((part: string) => part.trim()[0]!.toUpperCase())
-    .slice(0, 2)
-    .join("");
+      .split(" ")
+      .filter((part: string) => part.trim().length > 0)
+      .map((part: string) => part.trim()[0]!.toUpperCase())
+      .slice(0, 2)
+      .join("");
 };
 
 export function Header({ variant = "default" }: HeaderProps) {
@@ -43,12 +43,12 @@ export function Header({ variant = "default" }: HeaderProps) {
   const { theme, setMode } = useTheme();
 
   const showSearch =
-    variant === "search" ||
-    ["/", "/research", "/messages", "/account", "/profile"].some((p) =>
-      pathname.startsWith(p),
-    );
+      variant === "search" ||
+      ["/", "/research", "/messages", "/account", "/profile"].some((p) =>
+          pathname.startsWith(p),
+      );
 
-  // Déterminer si l’utilisateur est connecté + charger son avatar
+  // Déterminer si l’utilisateur est connecté + charger son avatar au chargement
   useEffect(() => {
     async function checkAuthAndProfile() {
       const {
@@ -66,10 +66,10 @@ export function Header({ variant = "default" }: HeaderProps) {
 
       // Récupération du profil pour l’avatar
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("avatar_url, display_name, first_name, last_name")
-        .eq("id", user.id)
-        .single();
+          .from("profiles")
+          .select("avatar_url, display_name, first_name, last_name")
+          .eq("id", user.id)
+          .single();
 
       if (profile?.avatar_url) {
         setAvatarUrl(profile.avatar_url);
@@ -79,19 +79,43 @@ export function Header({ variant = "default" }: HeaderProps) {
 
       // Initiales pour le fallback (display_name > prénom/nom > email > ME)
       const baseName =
-        profile?.display_name ||
-        [profile?.first_name, profile?.last_name]
-          .filter(Boolean)
-          .join(" ")
-          .trim() ||
-        user.email ||
-        "ME";
+          profile?.display_name ||
+          [profile?.first_name, profile?.last_name]
+              .filter(Boolean)
+              .join(" ")
+              .trim() ||
+          user.email ||
+          "ME";
 
       const initials = getInitials(baseName);
       setAvatarInitials(initials || "ME");
     }
 
     void checkAuthAndProfile();
+  }, []);
+
+  // ✅ Écouter les mises à jour d'avatar provenant de /account
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleAvatarUpdated = (event: Event) => {
+      const custom = event as CustomEvent<{ avatarUrl?: string }>;
+      if (custom.detail?.avatarUrl) {
+        setAvatarUrl(custom.detail.avatarUrl);
+      }
+    };
+
+    window.addEventListener(
+        "elan:avatar-updated",
+        handleAvatarUpdated as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+          "elan:avatar-updated",
+          handleAvatarUpdated as EventListener,
+      );
+    };
   }, []);
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -124,88 +148,88 @@ export function Header({ variant = "default" }: HeaderProps) {
   const handleToggleTheme = () => {
     setMode(theme.mode === "light" ? "dark" : "light");
   };
-  
+
   return (
-    <header className="border-b bg-background/80">
-      <div className="mx-auto flex max-w-[1440px] items-center gap-6 px-6 py-4">
-        {/* Logo */}
-        <Link href="/" className="font-serif text-2xl">
-          Élan
-        </Link>
-
-        {/* Barre de recherche */}
-        {showSearch && (
-          <form className="flex-1" onSubmit={handleSearchSubmit}>
-            <Input
-              placeholder="Rechercher…"
-              className="rounded-full"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </form>
-        )}
-
-        <div className="flex items-center gap-3">
-          <Link href="/sell">
-            <Button>Vendre un article</Button>
+      <header className="border-b bg-background/80">
+        <div className="mx-auto flex max-w-[1440px] items-center gap-6 px-6 py-4">
+          {/* Logo */}
+          <Link href="/" className="font-serif text-2xl">
+            Élan
           </Link>
 
-          {/* Icône / menu compte */}
-          {!isAuthenticated ? (
-            // Utilisateur non connecté : lien direct vers la page de connexion
-            <Link href="/login" aria-label="Mon compte">
-              <Avatar className="h-8 w-8 cursor-pointer">
-                <AvatarFallback className="text-xs">ME</AvatarFallback>
-              </Avatar>
-            </Link>
-          ) : (
-            // Utilisateur connecté : avatar réel (ou initiales) dans le menu
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Menu compte"
-                  className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                >
-                  <Avatar className="h-8 w-8 cursor-pointer">
-                    {avatarUrl && (
-                      <AvatarImage src={avatarUrl} alt="Photo de profil" />
-                    )}
-                    <AvatarFallback className="text-xs">
-                      {avatarInitials}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleGoToAccount}>
-                    Mon compte
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleGoToMessages}>
-                    Mes messages
-                  </DropdownMenuItem>
-                
-                  {/* 👇 Nouveau : switch thème */}
-                  <DropdownMenuItem onClick={handleToggleTheme}>
-                    <span className="mr-2 flex h-4 w-4 items-center justify-center">
-                      {theme.mode === "light" ? (
-                        <Moon className="h-4 w-4" />
-                      ) : (
-                        <Sun className="h-4 w-4" />
-                      )}
-                    </span>
-                    {theme.mode === "light" ? "Mode sombre" : "Mode clair"}
-                  </DropdownMenuItem>
-                
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
-                    Se déconnecter
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+          {/* Barre de recherche */}
+          {showSearch && (
+              <form className="flex-1" onSubmit={handleSearchSubmit}>
+                <Input
+                    placeholder="Rechercher…"
+                    className="rounded-full"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+              </form>
           )}
+
+          <div className="flex items-center gap-3">
+            <Link href="/sell">
+              <Button>Vendre un article</Button>
+            </Link>
+
+            {/* Icône / menu compte */}
+            {!isAuthenticated ? (
+                // Utilisateur non connecté : lien direct vers la page de connexion
+                <Link href="/login" aria-label="Mon compte">
+                  <Avatar className="h-8 w-8 cursor-pointer">
+                    <AvatarFallback className="text-xs">ME</AvatarFallback>
+                  </Avatar>
+                </Link>
+            ) : (
+                // Utilisateur connecté : avatar réel (ou initiales) dans le menu
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        aria-label="Menu compte"
+                        className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                    >
+                      <Avatar className="h-8 w-8 cursor-pointer">
+                        {avatarUrl && (
+                            <AvatarImage src={avatarUrl} alt="Photo de profil" />
+                        )}
+                        <AvatarFallback className="text-xs">
+                          {avatarInitials}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleGoToAccount}>
+                      Mon compte
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleGoToMessages}>
+                      Mes messages
+                    </DropdownMenuItem>
+
+                    {/* Switch thème */}
+                    <DropdownMenuItem onClick={handleToggleTheme}>
+                  <span className="mr-2 flex h-4 w-4 items-center justify-center">
+                    {theme.mode === "light" ? (
+                        <Moon className="h-4 w-4" />
+                    ) : (
+                        <Sun className="h-4 w-4" />
+                    )}
+                  </span>
+                      {theme.mode === "light" ? "Mode sombre" : "Mode clair"}
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout}>
+                      Se déconnecter
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
   );
 }

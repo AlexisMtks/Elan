@@ -36,6 +36,20 @@ type AddressRow = {
     country: string | null;
 };
 
+type AccountFormValues = {
+    username: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    addressLine1: string;
+    postcode: string;
+    city: string;
+    country: string;
+    gender: "female" | "male" | "other" | "unspecified";
+    avatarFile?: File | null;
+};
+
 export function AccountPageClient() {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<Stats>({
@@ -183,6 +197,162 @@ export function AccountPageClient() {
         }
     };
 
+    const handleAccountSubmit = async (values: AccountFormValues) => {
+        if (!userId) return;
+
+        setErrorMsg(null);
+
+        // 1. Mettre à jour l'email d'authentification si nécessaire
+        if (values.email && values.email !== email) {
+            const { error: emailError } = await supabase.auth.updateUser({
+                email: values.email,
+            });
+
+            if (emailError) {
+                console.error("Erreur mise à jour de l'email:", emailError);
+                setErrorMsg("Impossible de mettre à jour l'e-mail.");
+                return;
+            }
+
+            setEmail(values.email);
+        }
+
+        // 2. Mettre à jour le profil
+        const displayName =
+            [values.firstName, values.lastName].filter(Boolean).join(" ") ||
+            values.username ||
+            profile?.display_name ||
+            values.email;
+
+        const { error: profileError } = await supabase
+            .from("profiles")
+            .update({
+                username: values.username || null,
+                first_name: values.firstName || null,
+                last_name: values.lastName || null,
+                display_name: displayName,
+                phone_number: values.phone || null,
+                city: values.city || null,
+                country: values.country || null,
+                gender: values.gender,
+            })
+            .eq("id", userId);
+
+        if (profileError) {
+            console.error("Erreur mise à jour du profil:", profileError);
+            setErrorMsg("Erreur lors de la mise à jour du profil.");
+            return;
+        }
+
+        setProfile((prev) =>
+            prev
+                ? {
+                    ...prev,
+                    username: values.username || null,
+                    first_name: values.firstName || null,
+                    last_name: values.lastName || null,
+                    display_name: displayName,
+                    phone_number: values.phone || null,
+                    city: values.city || null,
+                    country: values.country || null,
+                    gender: values.gender,
+                }
+                : prev,
+        );
+
+        // 3. Upsert de l'adresse (si tous les champs nécessaires sont renseignés)
+        const hasAddress =
+            values.addressLine1.trim() &&
+            values.city.trim() &&
+            values.postcode.trim() &&
+            values.country.trim();
+
+        if (hasAddress) {
+            const { error: addressError } = await supabase
+                .from("addresses")
+                .upsert(
+                    {
+                        user_id: userId,
+                        line1: values.addressLine1.trim(),
+                        city: values.city.trim(),
+                        postcode: values.postcode.trim(),
+                        country: values.country.trim(),
+                    },
+                    {
+                        onConflict: "user_id",
+                    },
+                );
+
+            if (addressError) {
+                console.error("Erreur mise à jour de l'adresse:", addressError);
+                setErrorMsg("Erreur lors de la mise à jour de l'adresse.");
+                return;
+            }
+
+            setAddress({
+                line1: values.addressLine1.trim(),
+                line2: address?.line2 ?? null,
+                city: values.city.trim(),
+                postcode: values.postcode.trim(),
+                country: values.country.trim(),
+            });
+        }
+
+        // 4. Upload de la nouvelle photo de profil si présente
+        if (values.avatarFile) {
+            try {
+                const formData = new FormData();
+                formData.append("file", values.avatarFile);
+                formData.append("userId", userId);
+
+                const res = await fetch("/api/account/avatar", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const data = await res.json().catch(() => null);
+
+                if (!res.ok) {
+                    console.error("Avatar upload API error:", data);
+                    setErrorMsg(
+                        data?.error ??
+                        "Erreur lors de l’upload de la photo de profil.",
+                    );
+                    return;
+                }
+
+                const publicUrl: string = data.publicUrl;
+                // Ajout d’un paramètre pour casser le cache navigateur
+                const cacheBustedUrl = publicUrl.includes("?")
+                    ? `${publicUrl}&t=${Date.now()}`
+                    : `${publicUrl}?t=${Date.now()}`;
+
+                // Mettre à jour le profil local
+                setProfile((prev) =>
+                    prev
+                        ? {
+                            ...prev,
+                            avatar_url: cacheBustedUrl,
+                        }
+                        : prev,
+                );
+
+                // 🔔 Informer le header (et potentiellement d'autres composants)
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(
+                        new CustomEvent("elan:avatar-updated", {
+                            detail: { avatarUrl: cacheBustedUrl },
+                        }),
+                    );
+                }
+            } catch (err) {
+                console.error("Erreur upload avatar (client):", err);
+                setErrorMsg("Erreur lors de l’upload de la photo de profil.");
+                return;
+            }
+        }
+    };
+
     if (loading) {
         return (
             <div className="text-sm text-muted-foreground">
@@ -238,7 +408,7 @@ export function AccountPageClient() {
                         city: address?.city ?? profile.city ?? null,
                         country: address?.country ?? profile.country ?? null,
                     }}
-                    onAvatarChange={handleAvatarChange}
+                    onSubmit={handleAccountSubmit}
                 />
             </Card>
 
