@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 
+import { AppModal } from "@/components/modals/app-modal";
+import { Button } from "@/components/ui/button";
 import { PageTitle } from "@/components/misc/page-title";
 import { StatCard } from "@/components/misc/stat-card";
 import { PieChartPlaceholder } from "@/components/charts/pie-chart-placeholder";
@@ -34,6 +36,48 @@ export default function MyListingsPage() {
   const [loading, setLoading] = useState(true);
   const [listings, setListings] = useState<ListingRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [listingToDelete, setListingToDelete] = useState<ListingRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // ✅ handler suppression
+  // Appelé quand on clique sur "Supprimer" dans une carte
+  const handleRequestDelete = (listingId: string) => {
+    const listing = listings.find((l) => l.id === listingId);
+    if (!listing) return;
+
+    setListingToDelete(listing);
+    setConfirmModalOpen(true);
+  };
+
+  // Appelé quand on clique sur "Supprimer" dans le pop-up
+  const handleConfirmDelete = async () => {
+    if (!listingToDelete) return;
+
+    setIsDeleting(true);
+    setError(null);
+
+    const { error: deleteError } = await supabase
+        .from("listings")
+        .delete()
+        .eq("id", listingToDelete.id);
+
+    if (deleteError) {
+      console.error("Erreur suppression annonce :", deleteError);
+      setError("Impossible de supprimer cette annonce pour le moment.");
+      setIsDeleting(false);
+      return;
+    }
+
+    setListings((current) =>
+        current.filter((listing) => listing.id !== listingToDelete.id),
+    );
+
+    setIsDeleting(false);
+    setConfirmModalOpen(false);
+    setListingToDelete(null);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -182,6 +226,7 @@ export default function MyListingsPage() {
                         location={listing.city ?? "Non renseigné"}
                         status={mapStatus(listing.status)}
                         imageUrl={listing.imageUrl} // ✅ première image
+                        onDelete={handleRequestDelete}
                     />
                 ))}
               </div>
@@ -207,11 +252,55 @@ export default function MyListingsPage() {
                         location={listing.city ?? "Non renseigné"}
                         status={mapStatus(listing.status)}
                         imageUrl={listing.imageUrl} // ✅ première image
+                        onDelete={handleRequestDelete}
                     />
                 ))}
               </div>
           )}
         </section>
+
+        {/* Pop-up delete */}
+        <AppModal
+            open={confirmModalOpen}
+            onOpenChange={(open) => {
+              setConfirmModalOpen(open);
+              if (!open) {
+                setListingToDelete(null);
+                setIsDeleting(false);
+              }
+            }}
+            title="Supprimer l’annonce"
+            description="Cette action est définitive et ne peut pas être annulée."
+            // variant par défaut : on utilise children + footer
+            footer={
+              <div className="flex justify-end gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setConfirmModalOpen(false);
+                      setListingToDelete(null);
+                    }}
+                    disabled={isDeleting}
+                >
+                  Annuler
+                </Button>
+                <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleConfirmDelete}
+                    disabled={isDeleting}
+                >
+                  {isDeleting ? "Suppression..." : "Supprimer"}
+                </Button>
+              </div>
+            }
+        >
+          <p className="text-sm text-muted-foreground">
+            Êtes-vous sûr de vouloir supprimer l’annonce
+            {listingToDelete ? ` « ${listingToDelete.title} »` : ""} ?
+          </p>
+        </AppModal>
       </div>
   );
 }

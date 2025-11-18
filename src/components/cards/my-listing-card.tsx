@@ -14,6 +14,7 @@ interface MyListingCardProps {
     location: string;
     status: ListingStatus;
     imageUrl?: string;
+    onDelete?: (id: string) => void | Promise<void>;
 }
 
 export function MyListingCard({
@@ -23,6 +24,7 @@ export function MyListingCard({
                                   location,
                                   status,
                                   imageUrl,
+                                  onDelete,
                               }: MyListingCardProps) {
     const router = useRouter();
 
@@ -32,6 +34,12 @@ export function MyListingCard({
     };
 
     const handleDelete = () => {
+        if (onDelete) {
+            onDelete(id);
+            return;
+        }
+
+        // Fallback si onDelete n'est pas fourni
         alert("Simulation : suppression de l’annonce.");
     };
 
