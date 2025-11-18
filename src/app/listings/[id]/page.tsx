@@ -101,22 +101,30 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
     }));
 
     return (
-        <div className="space-y-10">
+        <div className="mx-auto w-full max-w-6xl space-y-10 px-4 py-6 lg:py-8">
             {/* Top: galerie + résumé */}
-            <section className="grid gap-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-                <div>
-                    <ProductGallery images={images} />
+            <section className="grid gap-10 items-start lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
+                {/* Colonne image */}
+                <div className="flex justify-center lg:justify-start">
+                    <div className="w-full max-w-[720px]">
+                        <ProductGallery images={images} />
+                    </div>
                 </div>
 
-                <div className="space-y-6">
+                {/* Colonne droite */}
+                <div className="w-full lg:max-w-sm lg:ml-auto space-y-6">
                     <div className="space-y-4">
                         <PageTitle title={listing.title} />
-                        <p className="text-2xl font-semibold">{listing.price / 100} €</p>
+                        <p className="text-3xl font-semibold">
+                            {listing.price / 100} €
+                        </p>
 
                         {/* Boutons client */}
                         <ListingActions />
 
-                        <p className="text-sm text-muted-foreground">{location}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {location}
+                        </p>
                     </div>
 
                     <TechnicalDetails

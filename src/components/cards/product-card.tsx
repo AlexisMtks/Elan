@@ -14,25 +14,26 @@ interface ProductCardProps {
     footer?: React.ReactNode; // contenu personnalisable en bas
     clickable?: boolean;      // permet de désactiver le lien sur la carte
     href?: string;            // permet de surcharger la cible du lien
-    imageUrl?: string;        // ✅ nouvelle prop optionnelle pour l'image
+    imageUrl?: string;        // nouvelle prop optionnelle pour l'image
 }
 
 export function ProductCard({
-                                id,
-                                title,
-                                price,
-                                location,
-                                subtitle,
-                                variant = "default",
-                                footer,
-                                clickable = true,
-                                href,
-                                imageUrl,
-                            }: ProductCardProps) {
+    id,
+    title,
+    price,
+    location,
+    subtitle,
+    variant = "default",
+    footer,
+    clickable = true,
+    href,
+    imageUrl,
+}: ProductCardProps) {
     const targetHref = href ?? `/listings/${id}`;
 
-    const Wrapper: React.ComponentType<React.ComponentProps<"div"> & { href?: string }> =
-        clickable ? (Link as any) : ("div" as any);
+    const Wrapper: React.ComponentType<
+        React.ComponentProps<"div"> & { href?: string }
+    > = clickable ? (Link as any) : ("div" as any);
 
     const baseTextClasses =
         variant === "compact"
@@ -47,28 +48,35 @@ export function ProductCard({
             : "text-lg font-semibold";
 
     return (
-        <Card className="overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm">
+        <Card className="overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm p-0">
             <CardContent className="p-0">
-                <Wrapper href={clickable ? targetHref : undefined} className="block">
-                    {/* Image en haut de la carte */}
-                    <div className="aspect-[4/3] w-full overflow-hidden bg-muted">
-                        {imageUrl ? (
-                            <img
-                                src={imageUrl}
-                                alt={title}
-                                className="h-full w-full object-cover"
-                            />
-                        ) : (
-                            <div className="flex h-full w-full items-center justify-center text-[11px] text-muted-foreground">
-                                Photo à venir
-                            </div>
-                        )}
+                <Wrapper
+                    href={clickable ? targetHref : undefined}
+                    className="block"
+                >
+                    {/* Image avec padding régulier autour */}
+                    <div className="p-2 pb-0">
+                        <div className="aspect-[5/6] w-full overflow-hidden rounded-xl bg-muted">
+                            {imageUrl ? (
+                                <img
+                                    src={imageUrl}
+                                    alt={title}
+                                    className="h-full w-full object-cover"
+                                />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center text-[11px] text-muted-foreground">
+                                    Photo à venir
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Contenu texte */}
                     <div className={baseTextClasses}>
                         <div className="space-y-1">
-                            <h3 className="line-clamp-2 text-sm font-medium">{title}</h3>
+                            <h3 className="line-clamp-2 text-sm font-medium">
+                                {title}
+                            </h3>
 
                             {subtitle && (
                                 <p className="line-clamp-1 text-xs text-muted-foreground">
@@ -78,12 +86,16 @@ export function ProductCard({
                         </div>
 
                         <div className="mt-1 flex items-center justify-between gap-2">
-                            <p className={priceTextClasses}>{price.toFixed(2)} €</p>
+                            <p className={priceTextClasses}>
+                                {price.toFixed(2)} €
+                            </p>
 
                             {location && (
                                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                                     <MapPin className="h-3 w-3" />
-                                    <span className="line-clamp-1">{location}</span>
+                                    <span className="line-clamp-1">
+                                        {location}
+                                    </span>
                                 </span>
                             )}
                         </div>
