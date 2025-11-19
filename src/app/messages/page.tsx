@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { AppModal } from "@/components/modals/app-modal";
 import { AppIcon } from "@/components/misc/app-icon";
@@ -26,6 +26,7 @@ interface Conversation {
     unreadCount: number;
     buyerId: string;
     sellerId: string;
+    contactAvatarUrl: string | null;
 }
 
 interface Message {
@@ -139,8 +140,8 @@ export default function MessagesPage() {
         last_message_at,
         last_message_preview,
         listing:listings ( id, title ),
-        buyer:profiles!conversations_buyer_id_fkey ( id, display_name ),
-        seller:profiles!conversations_seller_id_fkey ( id, display_name ),
+        buyer:profiles!conversations_buyer_id_fkey ( id, display_name, avatar_url ),
+        seller:profiles!conversations_seller_id_fkey ( id, display_name, avatar_url ),
         messages:messages(count)
       `,
                 )
@@ -185,6 +186,7 @@ export default function MessagesPage() {
                     unreadCount,
                     buyerId: conv.buyer_id,
                     sellerId: conv.seller_id,
+                    contactAvatarUrl: contactProfile?.avatar_url ?? null,
                 };
             });
 
@@ -604,6 +606,9 @@ function ConversationItem({
             ].join(" ")}
         >
             <Avatar className="h-8 w-8">
+                {conversation.contactAvatarUrl && (
+                    <AvatarImage src={conversation.contactAvatarUrl} alt={conversation.contactName} />
+                )}
                 <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
 
@@ -671,6 +676,9 @@ function ThreadHeader({ conversation, onDelete }: ThreadHeaderProps) {
         <div className="flex items-center justify-between gap-4 border-b pb-3">
             <div className="flex items-center gap-3">
                 <Avatar className="h-9 w-9">
+                    {conversation.contactAvatarUrl && (
+                        <AvatarImage src={conversation.contactAvatarUrl} alt={conversation.contactName} />
+                    )}
                     <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="space-y-0.5 text-sm">
