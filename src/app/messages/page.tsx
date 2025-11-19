@@ -573,6 +573,11 @@ function ConversationItem({
             .join("")
             .toUpperCase() || "EL";
 
+    const truncate = (text: string, max = 40) => {
+        if (text.length <= max) return text;
+        return text.slice(0, max) + "…";
+    };
+
     const handleDeleteClick = (event: MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation(); // ✅ n’active pas le onSelect
         onDelete();
@@ -609,7 +614,7 @@ function ConversationItem({
                 </p>
                 {conversation.lastMessagePreview && (
                     <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                        {conversation.lastMessagePreview}
+                        {truncate(conversation.lastMessagePreview, 40)}
                     </p>
                 )}
             </div>
