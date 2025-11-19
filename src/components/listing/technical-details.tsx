@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 interface TechnicalDetailsProps {
+    listingId: string;
     seller: {
         id: string;
         name: string;
@@ -23,6 +24,7 @@ interface TechnicalDetailsProps {
 }
 
 export function TechnicalDetails({
+                                     listingId,
                                      seller,
                                      title,
                                      price,
@@ -55,7 +57,7 @@ export function TechnicalDetails({
                 />
             </div>
 
-            <Separator className="-my-2" />
+            <Separator className="-my-2"/>
 
             {/* 2. Titre + prix + actions (moins d'espace) */}
             <div className="space-y-2">
@@ -65,28 +67,35 @@ export function TechnicalDetails({
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-2xl font-semibold">{formattedPrice}</p>
-                    <ListingActions />
+                    <ListingActions/>
                 </div>
             </div>
 
-            <Separator className="-my-2" />
+            <Separator className="-my-2"/>
 
             {/* 3. Détails techniques (écart réduit) */}
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                <DetailRow label="Catégorie" value={category} layout="stacked" size="sm" />
-                <DetailRow label="Lieu" value={location} layout="stacked" size="sm" />
-                <DetailRow label="Marque" value={brand} layout="stacked" size="sm" />
-                <DetailRow label="Taille" value={size} layout="stacked" size="sm" />
-                <DetailRow label="État" value={condition} layout="stacked" size="sm" />
+                <DetailRow label="Catégorie" value={category} layout="stacked" size="sm"/>
+                <DetailRow label="Lieu" value={location} layout="stacked" size="sm"/>
+                <DetailRow label="Marque" value={brand} layout="stacked" size="sm"/>
+                <DetailRow label="Taille" value={size} layout="stacked" size="sm"/>
+                <DetailRow label="État" value={condition} layout="stacked" size="sm"/>
             </dl>
 
-            <Separator className="-my-2" />
+            <Separator className="-my-2"/>
 
             {/* 4. Boutons contacter / voir profil */}
             <div className="flex flex-col gap-2">
-
                 <Button asChild>
-                    <Link href={`/messages/new?seller=${seller.id}`}>
+                    <Link
+                        href={{
+                            pathname: "/messages",
+                            query: {
+                                seller: seller.id,
+                                listing: listingId,
+                            },
+                        }}
+                    >
                         Contacter le vendeur
                     </Link>
                 </Button>
@@ -96,7 +105,6 @@ export function TechnicalDetails({
                         Voir le profil
                     </Link>
                 </Button>
-
             </div>
         </Card>
     );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,9 @@ type ConversationId = number;
 interface Conversation {
   id: ConversationId;
   contactName: string;
+  contactProfileId: string | null;
   productTitle: string;
+  listingId: string | null;
   lastMessagePreview: string | null;
   updatedAt: string;
   unreadCount: number;
@@ -30,9 +33,12 @@ interface Message {
 export default function MessagesPage() {
   const { user, checking } = useRequireAuth();
 
+  const searchParams = useSearchParams();
+  const sellerIdFromQuery = searchParams.get("seller");
+  const listingIdFromQuery = searchParams.get("listing");
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversationId, setSelectedConversationId] =
-      useState<ConversationId | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<ConversationId | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [loadingConversations, setLoadingConversations] = useState(false);
@@ -50,9 +56,12 @@ export default function MessagesPage() {
           .select(
               `
           id,
+          buyer_id,
+          seller_id,
+          listing_id,
           last_message_at,
           last_message_preview,
-          listing:listings ( title ),
+          listing:listings ( id, title ),
           buyer:profiles!conversations_buyer_id_fkey ( id, display_name ),
           seller:profiles!conversations_seller_id_fkey ( id, display_name ),
           messages:messages(count)
@@ -72,16 +81,19 @@ export default function MessagesPage() {
         const buyerRow = conv.buyer?.[0];
         const listingRow = conv.listing?.[0];
 
-        const isSeller = sellerRow?.id === user.id;
+        const isSeller = conv.seller_id === user.id;
+        const contactProfile = isSeller ? buyerRow : sellerRow;
 
-        const contactName = isSeller
-            ? buyerRow?.display_name ?? "Acheteur inconnu"
-            : sellerRow?.display_name ?? "Vendeur inconnu";
+        const contactName =
+            contactProfile?.display_name ??
+            (isSeller ? "Acheteur inconnu" : "Vendeur inconnu");
 
         return {
           id: conv.id as number,
           contactName,
+          contactProfileId: contactProfile?.id ?? null,      // ✅
           productTitle: listingRow?.title ?? "Annonce supprimée",
+          listingId: conv.listing_id ?? listingRow?.id ?? null, // ✅
           lastMessagePreview: conv.last_message_preview as string | null,
           updatedAt: conv.last_message_at
               ? new Date(conv.last_message_at).toLocaleString("fr-FR", {
@@ -94,15 +106,35 @@ export default function MessagesPage() {
       });
 
       setConversations(formatted);
-      if (formatted.length > 0 && !selectedConversationId) {
-        setSelectedConversationId(formatted[0].id);
+
+      // ✅ Si on vient d'une annonce, essayer de trouver la bonne conversation
+      let initialConversationId: ConversationId | null = null;
+
+      if (sellerIdFromQuery && listingIdFromQuery) {
+        const matched = formatted.find(
+            (conv) =>
+                conv.listingId === listingIdFromQuery &&
+                conv.contactProfileId === sellerIdFromQuery
+        );
+        if (matched) {
+          initialConversationId = matched.id;
+        }
+      }
+
+      // Sinon, fallback sur la première conversation
+      if (!initialConversationId && formatted.length > 0) {
+        initialConversationId = formatted[0].id;
+      }
+
+      if (initialConversationId) {
+        setSelectedConversationId(initialConversationId);
       }
 
       setLoadingConversations(false);
     };
 
     fetchConversations();
-  }, [user, selectedConversationId]);
+  }, [user, sellerIdFromQuery, listingIdFromQuery]);
 
   // 🔹 Charger les messages de la conversation sélectionnée
   useEffect(() => {
@@ -335,6 +367,8 @@ interface ThreadHeaderProps {
 }
 
 function ThreadHeader({ conversation }: ThreadHeaderProps) {
+  const router = useRouter();
+
   const initials =
       conversation.contactName
           .split(" ")
@@ -343,7 +377,9 @@ function ThreadHeader({ conversation }: ThreadHeaderProps) {
           .toUpperCase() || "EL";
 
   const handleViewListing = () => {
-    alert("Simulation : redirection vers la page de l’annonce liée.");
+    if (conversation.listingId) {
+      router.push(`/listings/${conversation.listingId}`);
+    }
   };
 
   return (

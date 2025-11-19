@@ -115,6 +115,7 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
                 {/* Colonne droite */}
                 <div className="w-full lg:ml-auto lg:max-w-md xl:max-w-lg">
                     <TechnicalDetails
+                        listingId={listing.id}
                         seller={seller}
                         title={listing.title}
                         price={listing.price / 100}
