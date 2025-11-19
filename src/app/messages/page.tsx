@@ -61,6 +61,25 @@ function extractPriceRaw(query: string): string | null {
     return match[1].replace(",", ".");
 }
 
+function formatConversationTimestamp(
+    input: string | Date | null | undefined,
+): string {
+    if (!input) return "";
+
+    const date = typeof input === "string" ? new Date(input) : input;
+    if (Number.isNaN(date.getTime())) return "";
+
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+
+    const hh = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
+
+    // JJ/MM/AAAA HH:MM
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
+
 export default function MessagesPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [searchResults, setSearchResults] = useState<Conversation[]>([]);
@@ -193,8 +212,9 @@ export default function MessagesPage() {
 
             type MessagesAggregate = {
                 [conversationId: number]: {
-                    text: string;   // concat des contenus pour la recherche
-                    count: number; // nombre de messages (pour unreadCount approximatif)
+                    text: string;         // concat des contenus pour la recherche
+                    count: number;        // nombre de messages
+                    lastCreatedAt: string | null; // date du dernier message (reçu ou envoyé)
                 };
             };
 
@@ -203,19 +223,38 @@ export default function MessagesPage() {
             if (conversationIds.length > 0) {
                 const { data: messagesData, error: messagesError } = await supabase
                     .from("messages")
-                    .select("conversation_id, content")
+                    .select("conversation_id, content, created_at")
                     .in("conversation_id", conversationIds);
 
                 if (messagesError) {
-                    console.error("Erreur chargement messages pour la recherche :", messagesError);
+                    console.error(
+                        "Erreur chargement messages pour la recherche :",
+                        messagesError,
+                    );
                 } else {
                     for (const m of messagesData ?? []) {
                         const convId = m.conversation_id as number;
+
                         if (!messagesAggregate[convId]) {
-                            messagesAggregate[convId] = { text: "", count: 0 };
+                            messagesAggregate[convId] = {
+                                text: "",
+                                count: 0,
+                                lastCreatedAt: null,
+                            };
                         }
+
+                        const createdAt = m.created_at as string | null;
+
                         messagesAggregate[convId].text += ` ${m.content ?? ""}`;
                         messagesAggregate[convId].count += 1;
+
+                        // on garde la date du dernier message
+                        if (createdAt) {
+                            const current = messagesAggregate[convId].lastCreatedAt;
+                            if (!current || createdAt > current) {
+                                messagesAggregate[convId].lastCreatedAt = createdAt;
+                            }
+                        }
                     }
                 }
             }
@@ -235,7 +274,12 @@ export default function MessagesPage() {
                 const aggregate = messagesAggregate[conv.id as number] ?? {
                     text: "",
                     count: 0,
+                    lastCreatedAt: null,
                 };
+
+                // on prend d’abord last_message_at si présent, sinon la date du dernier message
+                const lastTimestamp: string | Date | null =
+                    (conv.last_message_at as string | null) ?? aggregate.lastCreatedAt;
 
                 return {
                     id: conv.id as number,
@@ -244,19 +288,12 @@ export default function MessagesPage() {
                     productTitle: listingRow?.title ?? "Annonce supprimée",
                     listingId: conv.listing_id ?? listingRow?.id ?? null,
                     lastMessagePreview: conv.last_message_preview as string | null,
-                    updatedAt: conv.last_message_at
-                        ? new Date(conv.last_message_at).toLocaleString("fr-FR", {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                        })
-                        : "Date inconnue",
-                    // ici on continue d'utiliser "unreadCount" comme compteur de messages
+                    updatedAt: formatConversationTimestamp(lastTimestamp),
                     unreadCount: aggregate.count,
                     buyerId: conv.buyer_id,
                     sellerId: conv.seller_id,
                     contactAvatarUrl: contactProfile?.avatar_url ?? null,
                     listingPrice: listingRow?.price ?? null,
-                    // 🔑 texte utilisé pour la recherche dans handleSearch
                     messagesSearchText: aggregate.text,
                 };
             });
@@ -346,16 +383,18 @@ export default function MessagesPage() {
             .select("id, sender_id, content, created_at")
             .single();
 
-        if (error) {
+        if (error || !data) {
             console.error("Erreur envoi message :", error);
             return;
         }
+
+        const sentAt = new Date(data.created_at);
 
         const newMessage: Message = {
             id: data.id.toString(),
             fromMe: true,
             content: data.content ?? content,
-            time: new Date(data.created_at).toLocaleTimeString("fr-FR", {
+            time: sentAt.toLocaleTimeString("fr-FR", {
                 hour: "2-digit",
                 minute: "2-digit",
             }),
@@ -365,14 +404,16 @@ export default function MessagesPage() {
         setMessages((prev) => [...prev, newMessage]);
         setMessageInput("");
 
-        // MAJ rapide des métadonnées de la conversation (pour l’UI)
+        // MAJ rapide des métadonnées de la conversation (pour l’UI + recherche)
         setConversations((prev) =>
             prev.map((c) =>
                 c.id === selectedConversationId
                     ? {
                         ...c,
                         lastMessagePreview: newMessage.content,
-                        updatedAt: newMessage.time,
+                        updatedAt: formatConversationTimestamp(sentAt),
+                        messagesSearchText: `${c.messagesSearchText ?? ""} ${newMessage.content}`,
+                        unreadCount: c.unreadCount + 1,
                     }
                     : c,
             ),
