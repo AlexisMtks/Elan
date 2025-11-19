@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { AppModal } from "@/components/modals/app-modal";
+import { AppIcon } from "@/components/misc/app-icon";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -309,9 +311,8 @@ export default function MessagesPage() {
     );
 
     // Demande de suppression (ouvre le pop-up)
-    const handleRequestDeleteConversation = () => {
-        if (!selectedConversation) return;
-        setConversationToDelete(selectedConversation);
+    const handleRequestDeleteConversation = (conversation: Conversation) => {
+        setConversationToDelete(conversation);
         setDeleteModalOpen(true);
     };
 
@@ -434,6 +435,7 @@ export default function MessagesPage() {
                                 onSelect={() =>
                                     setSelectedConversationId(conversation.id)
                                 }
+                                onDelete={() => handleRequestDeleteConversation(conversation)}
                             />
                         ))}
                     </div>
@@ -445,7 +447,7 @@ export default function MessagesPage() {
                         <>
                             <ThreadHeader
                                 conversation={selectedConversation}
-                                onDelete={handleRequestDeleteConversation}
+                                onDelete={() => handleRequestDeleteConversation(selectedConversation)}
                             />
 
                             <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-2xl bg-muted/40 p-3 text-sm">
@@ -559,12 +561,14 @@ interface ConversationItemProps {
     conversation: Conversation;
     isActive: boolean;
     onSelect: () => void;
+    onDelete: () => void;
 }
 
 function ConversationItem({
                               conversation,
                               isActive,
                               onSelect,
+                              onDelete,
                           }: ConversationItemProps) {
     const initials =
         conversation.contactName
@@ -572,6 +576,11 @@ function ConversationItem({
             .map((n) => n[0])
             .join("")
             .toUpperCase() || "EL";
+
+    const handleDeleteClick = (event: MouseEvent<HTMLButtonElement>) => {
+        event.stopPropagation(); // ✅ n’ouvre pas la conversation
+        onDelete();
+    };
 
     return (
         <button
@@ -587,6 +596,7 @@ function ConversationItem({
             <Avatar className="h-8 w-8">
                 <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
+
             <div className="flex-1 space-y-0.5">
                 <p className="text-xs font-medium">{conversation.contactName}</p>
                 <p className="line-clamp-1 text-[11px] text-muted-foreground">
@@ -598,15 +608,27 @@ function ConversationItem({
                     </p>
                 )}
             </div>
-            <div className="flex flex-col items-end gap-1">
-        <span className="text-[10px] text-muted-foreground">
-          {conversation.updatedAt}
-        </span>
-                {conversation.unreadCount > 0 && (
-                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-foreground text-[10px] font-medium text-foreground-foreground">
-            {conversation.unreadCount}
-          </span>
-                )}
+
+            <div className="flex items-center gap-2">
+                <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] text-muted-foreground">
+                        {conversation.updatedAt}
+                    </span>
+                    {conversation.unreadCount > 0 && (
+                        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-foreground/10 px-1 text-[10px] font-medium text-foreground">
+                            {conversation.unreadCount}
+                        </span>
+                    )}
+                </div>
+
+                <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
+                    aria-label="Supprimer cette conversation"
+                >
+                    <AppIcon name="trash" size={14} />
+                </button>
             </div>
         </button>
     );
