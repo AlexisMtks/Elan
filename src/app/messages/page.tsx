@@ -43,7 +43,26 @@ function normalizeRelation<T = any>(rel: any): T | null {
     return rel;
 }
 
+function normalizeText(value: string): string {
+    if (!value) return "";
+    return value
+        .normalize("NFD") // décompose les accents
+        .replace(/[\u0300-\u036f]/g, "") // supprime les diacritiques
+        .toLowerCase();
+}
+
+// extrait un montant avec symbole de monnaie, ex: "50 €", "12.5$", "12,5€"
+function extractPriceRaw(query: string): string | null {
+    const match = query.match(/(\d+(?:[.,]\d+)?)[\s]*([€$£])/);
+    if (!match) return null;
+    // on garde la partie numérique sans formattage spécial
+    return match[1].replace(",", ".");
+}
+
 export default function MessagesPage() {
+    const [searchTerm, setSearchTerm] = useState("");
+    const [searchResults, setSearchResults] = useState<Conversation[]>([]);
+
     const [conversationCreated, setConversationCreated] = useState(false);
     const { user, checking } = useRequireAuth();
     const router = useRouter();
@@ -402,6 +421,67 @@ export default function MessagesPage() {
         );
     }
 
+    const handleSearch = (value: string) => {
+        setSearchTerm(value);
+
+        const raw = value.trim();
+        if (!raw) {
+            setSearchResults([]);
+            return;
+        }
+
+        const normalizedQuery = normalizeText(raw);
+        const priceToken = extractPriceRaw(raw);
+
+        const resultsWithScore = conversations
+            .map((conv) => {
+                const normalizedName = normalizeText(conv.contactName);
+                const normalizedTitle = normalizeText(conv.productTitle);
+                const normalizedPreview = normalizeText(conv.lastMessagePreview ?? "");
+
+                let score = 0;
+
+                // 🔹 priorité montant si présent dans la recherche
+                if (priceToken) {
+                    const pricePattern = priceToken.replace(".", "[.,]");
+                    const priceRegex = new RegExp(pricePattern);
+                    const textForPrice =
+                        (conv.lastMessagePreview ?? "") + " " + conv.productTitle;
+
+                    if (priceRegex.test(textForPrice)) {
+                        score += 300; // très forte priorité
+                    }
+                }
+
+                // 🔹 1) nom d'utilisateur
+                if (normalizedName.includes(normalizedQuery)) {
+                    score += 200;
+                }
+
+                // 🔹 2) nom de l’annonce
+                if (normalizedTitle.includes(normalizedQuery)) {
+                    score += 100;
+                }
+
+                // 🔹 3) contenu du dernier message (aperçu)
+                if (normalizedPreview.includes(normalizedQuery)) {
+                    score += 50;
+                }
+
+                return { conv, score };
+            })
+            .filter((item) => item.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .map((item) => item.conv);
+
+        setSearchResults(resultsWithScore);
+    };
+
+    const handleClearSearch = () => {
+        setSearchTerm("");
+        setSearchResults([]);
+    };
+
     // Ici, on est sûr d’avoir un user authentifié
     return (
         <>
@@ -410,10 +490,24 @@ export default function MessagesPage() {
                 <Card className="flex flex-col rounded-2xl border p-4">
                     <div className="space-y-3">
                         <p className="text-sm font-semibold">Conversations</p>
-                        <Input
-                            placeholder="Rechercher une conversation"
-                            className="h-9 text-sm"
-                        />
+                        <div className="flex items-center gap-2">
+                            <Input
+                                placeholder="Rechercher une conversation"
+                                className="h-9 text-sm"
+                                value={searchTerm}
+                                onChange={(e) => handleSearch(e.target.value)}
+                            />
+                            {searchTerm && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleClearSearch}
+                                >
+                                    Annuler
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="mt-4 flex flex-1 flex-col gap-2 overflow-y-auto">
@@ -429,17 +523,47 @@ export default function MessagesPage() {
                             </p>
                         )}
 
-                        {conversations.map((conversation) => (
-                            <ConversationItem
-                                key={conversation.id}
-                                conversation={conversation}
-                                isActive={conversation.id === selectedConversationId}
-                                onSelect={() =>
-                                    setSelectedConversationId(conversation.id)
-                                }
-                                onDelete={() => handleRequestDeleteConversation(conversation)}
-                            />
-                        ))}
+                        {/* 🔍 Résultats de recherche */}
+                        {searchTerm.trim() && !loadingConversations && (
+                            <>
+                                {searchResults.length === 0 ? (
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Aucune conversation ne correspond à votre recherche.
+                                    </p>
+                                ) : (
+                                    <div className="flex flex-col gap-2">
+                                        {searchResults.map((conversation) => (
+                                            <ConversationItem
+                                                key={`search-${conversation.id}`}
+                                                conversation={conversation}
+                                                isActive={conversation.id === selectedConversationId}
+                                                onSelect={() =>
+                                                    setSelectedConversationId(conversation.id)
+                                                }
+                                                onDelete={() =>
+                                                    handleRequestDeleteConversation(conversation)
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* séparateur */}
+                                <div className="my-3 border-t border-border/60"/>
+                            </>
+                        )}
+
+                        {/* 🔁 Liste complète, toujours affichée dessous */}
+                        {!loadingConversations &&
+                            conversations.map((conversation) => (
+                                <ConversationItem
+                                    key={conversation.id}
+                                    conversation={conversation}
+                                    isActive={conversation.id === selectedConversationId}
+                                    onSelect={() => setSelectedConversationId(conversation.id)}
+                                    onDelete={() => handleRequestDeleteConversation(conversation)}
+                                />
+                            ))}
                     </div>
                 </Card>
 
