@@ -28,6 +28,7 @@ interface Conversation {
     sellerId: string;
     contactAvatarUrl: string | null;
     listingPrice: number | null;
+    messagesSearchText: string;
 }
 
 interface Message {
@@ -148,45 +149,78 @@ export default function MessagesPage() {
                 }
             }
 
-            // 2) On (re)charge toutes les conversations de l'utilisateur avec les jointures complètes
-            const { data, error } = await supabase
+            // 2) On (re)charge toutes les conversations de l'utilisateur
+            const { data: convData, error: convError } = await supabase
                 .from("conversations")
                 .select(
                     `
+      id,
+      buyer_id,
+      seller_id,
+      listing_id,
+      last_message_at,
+      last_message_preview,
+      listing:listings (
         id,
-        buyer_id,
-        seller_id,
-        listing_id,
-        last_message_at,
-        last_message_preview,
-        listing:listings (
-          id,
-          title,
-          price
-        ),
-        buyer:profiles!conversations_buyer_id_fkey (
-          id,
-          display_name,
-          avatar_url
-        ),
-        seller:profiles!conversations_seller_id_fkey (
-          id,
-          display_name,
-          avatar_url
-        ),
-        messages:messages(count)
-      `,
+        title,
+        price
+      ),
+      buyer:profiles!conversations_buyer_id_fkey (
+        id,
+        display_name,
+        avatar_url
+      ),
+      seller:profiles!conversations_seller_id_fkey (
+        id,
+        display_name,
+        avatar_url
+      )
+    `,
                 )
                 .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
                 .order("last_message_at", { ascending: false });
 
-            if (error) {
-                console.error("Erreur chargement conversations :", error);
+            if (convError) {
+                console.error("Erreur chargement conversations :", convError);
                 setLoadingConversations(false);
                 return;
             }
 
-            const formatted: Conversation[] = (data ?? []).map((conv: any) => {
+            const conversationsRaw = convData ?? [];
+
+            // 👉 On récupère tous les ids de conversation
+            const conversationIds = conversationsRaw.map((c: any) => c.id).filter(Boolean);
+
+            type MessagesAggregate = {
+                [conversationId: number]: {
+                    text: string;   // concat des contenus pour la recherche
+                    count: number; // nombre de messages (pour unreadCount approximatif)
+                };
+            };
+
+            const messagesAggregate: MessagesAggregate = {};
+
+            if (conversationIds.length > 0) {
+                const { data: messagesData, error: messagesError } = await supabase
+                    .from("messages")
+                    .select("conversation_id, content")
+                    .in("conversation_id", conversationIds);
+
+                if (messagesError) {
+                    console.error("Erreur chargement messages pour la recherche :", messagesError);
+                } else {
+                    for (const m of messagesData ?? []) {
+                        const convId = m.conversation_id as number;
+                        if (!messagesAggregate[convId]) {
+                            messagesAggregate[convId] = { text: "", count: 0 };
+                        }
+                        messagesAggregate[convId].text += ` ${m.content ?? ""}`;
+                        messagesAggregate[convId].count += 1;
+                    }
+                }
+            }
+
+            const formatted: Conversation[] = conversationsRaw.map((conv: any) => {
                 const sellerRow = normalizeRelation(conv.seller);
                 const buyerRow = normalizeRelation(conv.buyer);
                 const listingRow = normalizeRelation(conv.listing);
@@ -198,9 +232,10 @@ export default function MessagesPage() {
                     contactProfile?.display_name ??
                     (isCurrentUserSeller ? "Acheteur inconnu" : "Vendeur inconnu");
 
-                const unreadCount = Array.isArray(conv.messages)
-                    ? conv.messages[0]?.count ?? 0
-                    : (conv.messages as any)?.count ?? 0;
+                const aggregate = messagesAggregate[conv.id as number] ?? {
+                    text: "",
+                    count: 0,
+                };
 
                 return {
                     id: conv.id as number,
@@ -215,11 +250,14 @@ export default function MessagesPage() {
                             timeStyle: "short",
                         })
                         : "Date inconnue",
-                    unreadCount,
+                    // ici on continue d'utiliser "unreadCount" comme compteur de messages
+                    unreadCount: aggregate.count,
                     buyerId: conv.buyer_id,
                     sellerId: conv.seller_id,
-                    contactAvatarUrl: contactProfile?.avatar_url ?? null,   // si présent
-                    listingPrice: listingRow?.price ?? null,                // ✅ ici (centimes)
+                    contactAvatarUrl: contactProfile?.avatar_url ?? null,
+                    listingPrice: listingRow?.price ?? null,
+                    // 🔑 texte utilisé pour la recherche dans handleSearch
+                    messagesSearchText: aggregate.text,
                 };
             });
 
@@ -453,7 +491,7 @@ export default function MessagesPage() {
             .map((conv) => {
                 const normalizedName = normalizeText(conv.contactName);
                 const normalizedTitle = normalizeText(conv.productTitle);
-                const normalizedPreview = normalizeText(conv.lastMessagePreview ?? "");
+                const normalizedMessages = normalizeText(conv.messagesSearchText ?? "");
 
                 let score = 0;
 
@@ -477,7 +515,7 @@ export default function MessagesPage() {
                 }
 
                 // 🔹 3) contenu du dernier message
-                if (normalizedPreview.includes(normalizedQuery)) {
+                if (normalizedMessages.includes(normalizedQuery)) {
                     score += 50;
                 }
 
@@ -523,7 +561,7 @@ export default function MessagesPage() {
                         </div>
                     </div>
 
-                    <div className="mt-4 flex flex-1 flex-col gap-2 overflow-y-auto">
+                    <div className="-mt-2 flex flex-1 flex-col gap-2 overflow-y-auto">
                         {loadingConversations && (
                             <p className="mt-6 text-center text-xs text-muted-foreground">
                                 Chargement de vos conversations…
@@ -556,13 +594,13 @@ export default function MessagesPage() {
                                                 onDelete={() =>
                                                     handleRequestDeleteConversation(conversation)
                                                 }
+                                                highlightTerm={searchTerm} // ✅ ici
                                             />
                                         ))}
                                     </div>
                                 )}
 
-                                {/* séparateur */}
-                                <div className="my-3 border-t border-border/60"/>
+                                <div className="my-3 border-t border-border/60" />
                             </>
                         )}
 
@@ -575,8 +613,10 @@ export default function MessagesPage() {
                                     isActive={conversation.id === selectedConversationId}
                                     onSelect={() => setSelectedConversationId(conversation.id)}
                                     onDelete={() => handleRequestDeleteConversation(conversation)}
+                                    // pas de highlightTerm ici → liste normale
                                 />
-                            ))}
+                            )
+                        )}
                     </div>
                 </Card>
 
@@ -697,6 +737,7 @@ interface ConversationItemProps {
     isActive: boolean;
     onSelect: () => void;
     onDelete: () => void;
+    highlightTerm?: string;
 }
 
 function ConversationItem({
@@ -704,6 +745,7 @@ function ConversationItem({
                               isActive,
                               onSelect,
                               onDelete,
+                              highlightTerm,
                           }: ConversationItemProps) {
     const initials =
         conversation.contactName
@@ -712,9 +754,38 @@ function ConversationItem({
             .join("")
             .toUpperCase() || "EL";
 
-    const truncate = (text: string, max = 40) => {
+    const buildSnippet = (text: string, term?: string, max = 40) => {
+        if (!text) return "";
         if (text.length <= max) return text;
-        return text.slice(0, max) + "…";
+
+        const cleanTerm = term?.trim();
+        if (!cleanTerm) {
+            return text.slice(0, max) + "…";
+        }
+
+        const lowerText = text.toLowerCase();
+        const lowerTerm = cleanTerm.toLowerCase();
+
+        const index = lowerText.indexOf(lowerTerm);
+        if (index === -1) {
+            // on ne trouve pas le terme → fallback classique
+            return text.slice(0, max) + "…";
+        }
+
+        const half = Math.floor((max - lowerTerm.length) / 2);
+        let start = Math.max(0, index - half);
+        let end = Math.min(text.length, start + max);
+
+        // petit ajustement si on est proche de la fin
+        if (end - start < max && start > 0) {
+            start = Math.max(0, end - max);
+        }
+
+        let snippet = text.slice(start, end);
+        if (start > 0) snippet = "…" + snippet;
+        if (end < text.length) snippet = snippet + "…";
+
+        return snippet;
     };
 
     const handleDeleteClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -727,6 +798,28 @@ function ConversationItem({
             event.preventDefault();
             onSelect();
         }
+    };
+
+    const highlightMatch = (text: string, term?: string) => {
+        if (!term?.trim()) return text;
+
+        const lowerText = text.toLowerCase();
+        const lowerTerm = term.toLowerCase();
+
+        const index = lowerText.indexOf(lowerTerm);
+        if (index === -1) return text;
+
+        const end = index + lowerTerm.length;
+
+        return (
+            <>
+                {text.slice(0, index)}
+                <span className="rounded-sm bg-amber-100 px-[2px]">
+                {text.slice(index, end)}
+            </span>
+                {text.slice(end)}
+            </>
+        );
     };
 
     return (
@@ -750,27 +843,49 @@ function ConversationItem({
             </Avatar>
 
             <div className="flex-1 space-y-0.5">
-                <p className="text-xs font-medium">{conversation.contactName}</p>
-                <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                    {conversation.productTitle}
+                <p className="text-xs font-medium">
+                    {highlightMatch(conversation.contactName, highlightTerm)}
                 </p>
+
+                {/* 🔍 Ligne 2 : en recherche → extrait du message, sinon titre de l'annonce */}
+                <p className="line-clamp-1 text-[11px] text-muted-foreground">
+                    {highlightTerm
+                        ? highlightMatch(
+                            buildSnippet(
+                                conversation.messagesSearchText ?? "",
+                                highlightTerm,
+                                40
+                            ),
+                            highlightTerm
+                        )
+                        : highlightMatch(conversation.productTitle, highlightTerm)}
+                </p>
+
+                {/* Ligne 3 : on garde le dernier message comme avant */}
                 {conversation.lastMessagePreview && (
                     <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                        {truncate(conversation.lastMessagePreview, 40)}
+                        {highlightMatch(
+                            buildSnippet(
+                                conversation.lastMessagePreview,
+                                highlightTerm,
+                                40,
+                            ),
+                            highlightTerm,
+                        )}
                     </p>
                 )}
             </div>
 
             <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2">
-    <span className="text-[10px] text-muted-foreground">
-        {conversation.updatedAt}
-    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                        {conversation.updatedAt}
+                    </span>
                     {conversation.unreadCount > 0 && (
                         <span
                             className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-foreground/10 px-1 text-[10px] font-medium text-foreground">
-            {conversation.unreadCount}
-        </span>
+                            {conversation.unreadCount}
+                        </span>
                     )}
                 </div>
 
