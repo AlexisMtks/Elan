@@ -4,6 +4,7 @@ import { FilterChips } from "@/components/filters/filter-chips";
 import { ProductCard } from "@/components/cards/product-card";
 import { PageTitle } from "@/components/misc/page-title";
 import { SearchListingsGrid } from "@/components/listing/search-listings-grid";
+import { SuggestedListingsGrid } from "@/components/listing/suggested-listings-grid";
 import { supabase } from "@/lib/supabaseClient";
 
 type CategoryValue = "all" | "agres" | "tapis" | "accessoires";
@@ -146,9 +147,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     // ----------------------------
     // 2) Requête Supabase
     // ----------------------------
-    // ----------------------------
-// 2) Requête Supabase
-// ----------------------------
     let supaQuery = supabase
         .from("listings")
         .select(
@@ -167,12 +165,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         )
         .eq("status", "active");
 
-// Recherche texte
+    // Recherche texte
     if (query) {
         supaQuery = supaQuery.ilike("title", `%${query}%`);
     }
 
-// Catégorie (via category_id, basé sur les seeds)
+    // Catégorie (via category_id, basé sur les seeds)
     if (category !== "all") {
         const categoryId = CATEGORY_ID_BY_SLUG[category as Exclude<CategoryValue, "all">];
         if (categoryId) {
@@ -180,7 +178,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         }
     }
 
-// Prix (en centimes en base)
+    // Prix (en centimes en base)
     if (minPrice !== undefined) {
         supaQuery = supaQuery.gte("price", minPrice * 100);
     }
@@ -188,24 +186,24 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         supaQuery = supaQuery.lte("price", maxPrice * 100);
     }
 
-// Conditions (in sur la colonne listings.condition)
+    // Conditions (in sur la colonne listings.condition)
     if (conditions.length > 0) {
         supaQuery = supaQuery.in("condition", conditions);
     }
 
-// Ville
+    // Ville
     if (city) {
         supaQuery = supaQuery.ilike("city", `${city}%`);
     }
 
-// Négociable (listings.is_negotiable)
+    // Négociable (listings.is_negotiable)
     if (negotiable === "yes") {
         supaQuery = supaQuery.eq("is_negotiable", true);
     } else if (negotiable === "no") {
         supaQuery = supaQuery.eq("is_negotiable", false);
     }
 
-// On récupère les données en ne gardant qu'une image par annonce (la première par position)
+    // On récupère les données en ne gardant qu'une image par annonce (la première par position)
     const { data, error, count } = await supaQuery
         .order("position", { foreignTable: "listing_images", ascending: true })
         .limit(1, { foreignTable: "listing_images" });
@@ -233,6 +231,70 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         : "Toutes les annonces";
 
     // ----------------------------
+    // 2 bis) Autres produits susceptibles d'intéresser l'utilisateur
+    // ----------------------------
+    let otherListings: ListingRow[] = [];
+
+    if (!error) {
+        const excludedIds = listings.map((l) => l.id);
+
+        let otherQuery = supabase
+            .from("listings")
+            .select(
+                `
+                id,
+                title,
+                price,
+                city,
+                seller_id,
+                listing_images (
+                  image_url,
+                  position
+                )
+              `,
+            )
+            .eq("status", "active");
+
+        // On privilégie la même catégorie si un filtre de catégorie est actif
+        if (category !== "all") {
+            const categoryId = CATEGORY_ID_BY_SLUG[category as Exclude<CategoryValue, "all">];
+            if (categoryId) {
+                otherQuery = otherQuery.eq("category_id", categoryId);
+            }
+        }
+
+        // On exclut toutes les annonces déjà présentes dans les résultats
+        if (excludedIds.length > 0) {
+            const idsList = excludedIds.join(","); // ⚠️ pas de quotes
+            otherQuery = otherQuery.not("id", "in", `(${idsList})`);
+        }
+
+        const { data: otherData, error: otherError } = await otherQuery
+            .order("created_at", { ascending: false })
+            .order("position", { foreignTable: "listing_images", ascending: true })
+            .limit(1, { foreignTable: "listing_images" })
+            .limit(6); // par ex. 6 suggestions
+
+        if (!otherError && otherData) {
+            otherListings = otherData.map((row: any) => {
+                const firstImage =
+                    Array.isArray(row.listing_images) && row.listing_images.length > 0
+                        ? row.listing_images[0].image_url
+                        : undefined;
+
+                return {
+                    id: row.id,
+                    title: row.title,
+                    price: row.price,
+                    city: row.city,
+                    sellerId: row.seller_id,
+                    imageUrl: firstImage,
+                } as ListingRow;
+            });
+        }
+    }
+
+    // ----------------------------
     // 3) Rendu
     // ----------------------------
     return (
@@ -258,6 +320,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 )}
 
                 <SearchListingsGrid listings={listings} hasError={!!error} />
+
+                {otherListings.length > 0 && (
+                    <SuggestedListingsGrid listings={otherListings} />
+                )}
             </div>
         </div>
     );
