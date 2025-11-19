@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
+import Image from "next/image";
 
 type HeaderVariant = "default" | "search" | "compact";
 
@@ -153,8 +154,50 @@ export function Header({ variant = "default" }: HeaderProps) {
       <header className="border-b bg-background/80">
         <div className="mx-auto flex max-w-[1440px] items-center gap-6 px-6 py-4">
           {/* Logo */}
-          <Link href="/" className="font-serif text-2xl">
-            Élan
+          <Link href="/" className="flex items-center">
+            {/* LOGO MOBILE */}
+            <span className="md:hidden flex items-center">
+              {/* version claire */}
+              <Image
+                  src="/logos/logo-light.png"
+                  alt="Élan"
+                  width={200}
+                  height={150}
+                  className="dark:hidden h-8 w-auto -translate-y-[2px]"
+                  priority
+              />
+              {/* version sombre */}
+              <Image
+                  src="/logos/logo-dark.png"
+                  alt="Élan"
+                  width={200}
+                  height={150}
+                  className="hidden dark:block h-8 w-auto -translate-y-[2px]"
+                  priority
+              />
+            </span>
+
+            {/* LOGO DESKTOP */}
+            <span className="hidden md:flex items-center">
+             {/* version claire */}
+              <Image
+                  src="/logos/logo-light.png"
+                  alt="Élan"
+                  width={400}
+                  height={300}
+                  className="dark:hidden h-9 w-auto -translate-y-[2px]"
+                  priority
+              />
+              {/* version sombre */}
+              <Image
+                  src="/logos/logo-dark.png"
+                  alt="Élan"
+                  width={400}
+                  height={300}
+                  className="hidden dark:block h-9 w-auto -translate-y-[2px]"
+                  priority
+              />
+            </span>
           </Link>
 
           {/* Barre de recherche */}
@@ -162,7 +205,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               <form className="flex-1" onSubmit={handleSearchSubmit}>
                 <Input
                     placeholder="Rechercher…"
-                    className="rounded-full"
+                    className="rounded-full translate-y-[1px]"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                 />
