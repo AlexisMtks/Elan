@@ -204,6 +204,56 @@ export function AccountPageClient() {
         });
     };
 
+    const handleDeleteAvatar = async () => {
+        if (!userId) return;
+
+        setErrorMsg(null);
+
+        try {
+            const res = await fetch(`/api/account/avatar?userId=${userId}`, {
+                method: "DELETE",
+            });
+
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok) {
+                console.error("Erreur suppression avatar:", data);
+                setErrorMsg(
+                    data?.error ?? "Erreur lors de la suppression de la photo de profil.",
+                );
+                return;
+            }
+
+            // reset des états locaux
+            setCroppedAvatarBlob(null);
+            if (avatarPreviewUrl) {
+                URL.revokeObjectURL(avatarPreviewUrl);
+                setAvatarPreviewUrl(null);
+            }
+            setRawAvatarFile(null);
+
+            setProfile((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        avatar_url: null,
+                    }
+                    : prev,
+            );
+
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                    new CustomEvent("elan:avatar-updated", {
+                        detail: { avatarUrl: null },
+                    }),
+                );
+            }
+        } catch (err) {
+            console.error("Erreur suppression avatar (client):", err);
+            setErrorMsg("Erreur lors de la suppression de la photo de profil.");
+        }
+    };
+
     const handleAccountSubmit = async (values: AccountFormValues) => {
         if (!userId) return;
 
@@ -416,7 +466,6 @@ export function AccountPageClient() {
                             displayName,
                             city: profile.city,
                             country: profile.country,
-                            // si un nouvel avatar a été recadré, on l’utilise pour l’aperçu
                             avatarUrl: avatarPreviewUrl ?? profile.avatar_url,
                             bio: profile.bio,
                             phoneNumber: profile.phone_number,
@@ -431,8 +480,8 @@ export function AccountPageClient() {
                         }}
                         onSubmit={handleAccountSubmit}
                         onChangePasswordClick={() => setPasswordModalOpen(true)}
-                        // 🔹 nouvelle prop pour remonter le fichier brut
                         onAvatarFileSelected={handleAvatarFileSelected}
+                        onDeleteAvatar={handleDeleteAvatar}      // ⬅️ nouveau
                     />
                 </Card>
 

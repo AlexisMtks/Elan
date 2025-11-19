@@ -75,3 +75,101 @@ export async function POST(req: NextRequest) {
         );
     }
 }
+
+export async function DELETE(req: NextRequest) {
+    try {
+        const { searchParams } = new URL(req.url);
+        const userId = searchParams.get("userId");
+
+        if (!userId || typeof userId !== "string") {
+            return NextResponse.json(
+                { error: "Missing or invalid userId" },
+                { status: 400 },
+            );
+        }
+
+        // 1) Récupérer l'URL actuelle de l'avatar
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from("profiles")
+            .select("avatar_url")
+            .eq("id", userId)
+            .single();
+
+        if (profileError) {
+            console.error(
+                "[API /account/avatar] Profile fetch error (DELETE):",
+                profileError,
+            );
+            return NextResponse.json(
+                { error: "Impossible de récupérer le profil" },
+                { status: 500 },
+            );
+        }
+
+        const avatarUrl = (profile?.avatar_url as string | null) ?? null;
+
+        // 2) Si on a une URL, tenter de supprimer le fichier du bucket avatars
+        if (avatarUrl) {
+            try {
+                const url = new URL(avatarUrl);
+                // Exemple de path: /storage/v1/object/public/avatars/userId/avatar-xxx.jpg
+                const pathname = url.pathname; // "/storage/v1/object/public/avatars/...."
+                const marker = "/avatars/";
+
+                const idx = pathname.indexOf(marker);
+                if (idx !== -1) {
+                    const path = pathname.slice(idx + marker.length); // "userId/avatar-xxx.jpg"
+
+                    if (path) {
+                        const { error: storageError } = await supabaseAdmin.storage
+                            .from("avatars")
+                            .remove([path]);
+
+                        if (storageError) {
+                            console.error(
+                                "[API /account/avatar] Storage delete error:",
+                                storageError,
+                            );
+                            // on log, mais on continue pour mettre avatar_url à null
+                        }
+                    }
+                }
+            } catch (parseErr) {
+                console.error(
+                    "[API /account/avatar] Error parsing avatar URL:",
+                    parseErr,
+                );
+                // on continue quand même
+            }
+        }
+
+        // 3) Mettre avatar_url à null dans profiles
+        const { error: updateError } = await supabaseAdmin
+            .from("profiles")
+            .update({ avatar_url: null })
+            .eq("id", userId);
+
+        if (updateError) {
+            console.error(
+                "[API /account/avatar] Profile update error (DELETE):",
+                updateError,
+            );
+            return NextResponse.json(
+                { error: "Impossible de mettre à jour le profil" },
+                { status: 500 },
+            );
+        }
+
+        return NextResponse.json({ success: true }, { status: 200 });
+    } catch (err: any) {
+        console.error("[API /account/avatar] Unexpected error (DELETE):", err);
+        return NextResponse.json(
+            {
+                error:
+                    err?.message ??
+                    "Unexpected error in /api/account/avatar DELETE handler",
+            },
+            { status: 500 },
+        );
+    }
+}

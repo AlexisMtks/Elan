@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import {
     Dialog,
@@ -31,11 +31,40 @@ export function AvatarCropperDialog({
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
     const [loading, setLoading] = useState(false);
 
-    // Crée un URL local quand le fichier change
-    if (file && !imageUrl) {
+    // Met à jour l'URL locale dès que le fichier change
+    useEffect(() => {
+        // Aucun fichier -> reset complet
+        if (!file) {
+            if (imageUrl) {
+                URL.revokeObjectURL(imageUrl);
+            }
+            setImageUrl(null);
+            setCroppedAreaPixels(null);
+            setZoom(1);
+            setCrop({ x: 0, y: 0 });
+            return;
+        }
+
+        // Nouveau fichier -> créer une nouvelle URL + reset du crop
         const url = URL.createObjectURL(file);
-        setImageUrl(url);
-    }
+
+        setImageUrl((prev) => {
+            if (prev) {
+                URL.revokeObjectURL(prev);
+            }
+            return url;
+        });
+
+        setCroppedAreaPixels(null);
+        setZoom(1);
+        setCrop({ x: 0, y: 0 });
+
+        // Cleanup si le composant est démonté ou si le fichier change
+        return () => {
+            URL.revokeObjectURL(url);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [file]);
 
     const onCropComplete = useCallback(
         (_croppedArea: Area, croppedAreaPixels: Area) => {

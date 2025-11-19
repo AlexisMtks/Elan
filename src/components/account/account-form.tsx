@@ -11,6 +11,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AppIcon } from "@/components/misc/app-icon";
 
@@ -52,9 +63,10 @@ interface AccountFormProps {
   onSubmit?: (values: AccountFormValues) => Promise<void> | void;
   onChangePasswordClick?: () => void;
   onAvatarFileSelected?: (file: File | null) => void;
+  onDeleteAvatar?: () => void;
 }
 
-export function AccountForm({ profile, email, address, onSubmit, onChangePasswordClick, onAvatarFileSelected,}: AccountFormProps) {
+export function AccountForm({ profile, email, address, onSubmit, onChangePasswordClick, onAvatarFileSelected, onDeleteAvatar,}: AccountFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gender, setGender] = useState<Gender>(
       (profile.gender as Gender) || "unspecified",
@@ -136,8 +148,7 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
           </div>
 
           {/* Avatar cliquable avec hover sombre */}
-          <div className="flex flex-col items-center gap-2 md:items-end relative">
-            {/* Wrapper taille fixe pour avatar + icône */}
+          <div className="flex flex-col items-center gap-2 md:items-end">
             <div className="relative h-16 w-16">
               {/* Avatar cliquable */}
               <button
@@ -158,29 +169,48 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
                 )}
               </button>
 
-              {/* Bouton supprimer avatar */}
-              <button
-                  type="button"
-                  onClick={() => console.log("TODO: supprimer avatar")}
-                  className="
-                        absolute
-                        bottom-0
-                        right-0
-                        h-7
-                        w-7
-                        rounded-full
-                        bg-background
-                        shadow
-                        flex
-                        items-center
-                        justify-center
-                        border
-                        border-border
-                      "
-                  aria-label="Supprimer la photo de profil"
-              >
-                <AppIcon name="trash" size={16}/>
-              </button>
+              {/* Bouton supprimer avatar + popup de confirmation */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                      type="button"
+                      className="
+                            absolute
+                            bottom-0
+                            right-0
+                            h-7
+                            w-7
+                            rounded-full
+                            bg-background
+                            shadow
+                            flex
+                            items-center
+                            justify-center
+                            border
+                            border-border
+                          "
+                      aria-label="Supprimer la photo de profil"
+                  >
+                    <AppIcon name="trash" size={16}/>
+                  </button>
+                </AlertDialogTrigger>
+
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Supprimer la photo de profil ?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Cette action va supprimer définitivement votre photo de profil. Vous
+                      pourrez en ajouter une nouvelle plus tard si vous le souhaitez.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => {onDeleteAvatar?.();}}>
+                      Supprimer
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
 
             {/* Input fichier caché */}
@@ -197,86 +227,87 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
           </div>
         </div>
 
-        {/* Champs du formulaire */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Username */}
-          <div className="space-y-2">
-            <Label htmlFor="username">Nom d’utilisateur</Label>
-            <Input
-                id="username"
-                name="username"
-                placeholder="ex. marie_lem"
-                defaultValue={profile.username ?? ""}
-            />
-          </div>
+          {/* Champs du formulaire */
+          }
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Username */}
+            <div className="space-y-2">
+              <Label htmlFor="username">Nom d’utilisateur</Label>
+              <Input
+                  id="username"
+                  name="username"
+                  placeholder="ex. marie_lem"
+                  defaultValue={profile.username ?? ""}
+              />
+            </div>
 
-          {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor="email">E-mail</Label>
-            <Input id="email" name="email" type="email" defaultValue={email}/>
-          </div>
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <Input id="email" name="email" type="email" defaultValue={email}/>
+            </div>
 
-          {/* Prénom */}
-          <div className="space-y-2">
-            <Label htmlFor="firstName">Prénom</Label>
-            <Input
-                id="firstName"
-                name="firstName"
-                defaultValue={profile.firstName ?? ""}
-            />
-          </div>
+            {/* Prénom */}
+            <div className="space-y-2">
+              <Label htmlFor="firstName">Prénom</Label>
+              <Input
+                  id="firstName"
+                  name="firstName"
+                  defaultValue={profile.firstName ?? ""}
+              />
+            </div>
 
-          {/* Nom */}
-          <div className="space-y-2">
-            <Label htmlFor="lastName">Nom</Label>
-            <Input
-                id="lastName"
-                name="lastName"
-                defaultValue={profile.lastName ?? ""}
-            />
-          </div>
+            {/* Nom */}
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Nom</Label>
+              <Input
+                  id="lastName"
+                  name="lastName"
+                  defaultValue={profile.lastName ?? ""}
+              />
+            </div>
 
-          {/* Téléphone */}
-          <div className="space-y-2">
-            <Label htmlFor="phone">Téléphone</Label>
-            <Input
-                id="phone"
-                name="phone"
-                defaultValue={profile.phoneNumber ?? ""}
-            />
-          </div>
+            {/* Téléphone */}
+            <div className="space-y-2">
+              <Label htmlFor="phone">Téléphone</Label>
+              <Input
+                  id="phone"
+                  name="phone"
+                  defaultValue={profile.phoneNumber ?? ""}
+              />
+            </div>
 
-          {/* Genre */}
-          <div className="space-y-2">
-            <Label htmlFor="gender">Genre</Label>
-            <Select value={gender} onValueChange={(value) => setGender(value as Gender)}>
-              <SelectTrigger id="gender">
-                <SelectValue placeholder="Sélectionner" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="female">Femme</SelectItem>
-                <SelectItem value="male">Homme</SelectItem>
-                <SelectItem value="other">Autre</SelectItem>
-                <SelectItem value="unspecified">Préférer ne pas répondre</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Genre */}
+            <div className="space-y-2">
+              <Label htmlFor="gender">Genre</Label>
+              <Select value={gender} onValueChange={(value) => setGender(value as Gender)}>
+                <SelectTrigger id="gender">
+                  <SelectValue placeholder="Sélectionner"/>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="female">Femme</SelectItem>
+                  <SelectItem value="male">Homme</SelectItem>
+                  <SelectItem value="other">Autre</SelectItem>
+                  <SelectItem value="unspecified">Préférer ne pas répondre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Adresse – Ligne 1 */}
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="address">Adresse</Label>
-            <Input
-                id="address"
-                name="address"
-                placeholder="12 rue des Fleurs"
-                defaultValue={address?.line1 ?? ""}
-            />
-          </div>
+            {/* Adresse – Ligne 1 */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="address">Adresse</Label>
+              <Input
+                  id="address"
+                  name="address"
+                  placeholder="12 rue des Fleurs"
+                  defaultValue={address?.line1 ?? ""}
+              />
+            </div>
 
-          {/* Code postal */}
-          <div className="space-y-2">
-            <Label htmlFor="postcode">Code postal</Label>
-            <Input
+            {/* Code postal */}
+            <div className="space-y-2">
+              <Label htmlFor="postcode">Code postal</Label>
+              <Input
                 id="postcode"
                 name="postcode"
                 placeholder="75000"
