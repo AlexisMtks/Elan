@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -75,6 +75,12 @@ export function FilterPanel() {
     }, [searchParams]);
 
     const [filters, setFilters] = useState<FilterState>(initialState);
+
+    useEffect(() => {
+        // ✅ dès que les searchParams changent (donc l'URL, via les chips)
+        // on remet le panneau à jour avec les valeurs dérivées de l'URL
+        setFilters(initialState);
+    }, [initialState]);
 
     const handlePriceChange = (values: number[]) => {
         if (!values.length) return;
