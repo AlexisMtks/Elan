@@ -27,6 +27,7 @@ interface Conversation {
     buyerId: string;
     sellerId: string;
     contactAvatarUrl: string | null;
+    listingPrice: number | null;
 }
 
 interface Message {
@@ -158,9 +159,21 @@ export default function MessagesPage() {
         listing_id,
         last_message_at,
         last_message_preview,
-        listing:listings ( id, title ),
-        buyer:profiles!conversations_buyer_id_fkey ( id, display_name, avatar_url ),
-        seller:profiles!conversations_seller_id_fkey ( id, display_name, avatar_url ),
+        listing:listings (
+          id,
+          title,
+          price
+        ),
+        buyer:profiles!conversations_buyer_id_fkey (
+          id,
+          display_name,
+          avatar_url
+        ),
+        seller:profiles!conversations_seller_id_fkey (
+          id,
+          display_name,
+          avatar_url
+        ),
         messages:messages(count)
       `,
                 )
@@ -205,7 +218,8 @@ export default function MessagesPage() {
                     unreadCount,
                     buyerId: conv.buyer_id,
                     sellerId: conv.seller_id,
-                    contactAvatarUrl: contactProfile?.avatar_url ?? null,
+                    contactAvatarUrl: contactProfile?.avatar_url ?? null,   // si présent
+                    listingPrice: listingRow?.price ?? null,                // ✅ ici (centimes)
                 };
             });
 
@@ -432,6 +446,8 @@ export default function MessagesPage() {
 
         const normalizedQuery = normalizeText(raw);
         const priceToken = extractPriceRaw(raw);
+        const queryPrice =
+            priceToken !== null ? parseFloat(priceToken) : null;
 
         const resultsWithScore = conversations
             .map((conv) => {
@@ -441,29 +457,26 @@ export default function MessagesPage() {
 
                 let score = 0;
 
-                // 🔹 priorité montant si présent dans la recherche
-                if (priceToken) {
-                    const pricePattern = priceToken.replace(".", "[.,]");
-                    const priceRegex = new RegExp(pricePattern);
-                    const textForPrice =
-                        (conv.lastMessagePreview ?? "") + " " + conv.productTitle;
-
-                    if (priceRegex.test(textForPrice)) {
-                        score += 300; // très forte priorité
+                // 🔹 priorité montant s’il est présent dans la recherche
+                if (queryPrice !== null && conv.listingPrice !== null) {
+                    const convPrice = conv.listingPrice / 100; // centimes -> €
+                    if (Math.abs(convPrice - queryPrice) < 0.01) {
+                        // 50.00 vs 50 => match
+                        score += 400; // priorité max
                     }
                 }
 
-                // 🔹 1) nom d'utilisateur
+                // 🔹 1) nom d’utilisateur
                 if (normalizedName.includes(normalizedQuery)) {
                     score += 200;
                 }
 
-                // 🔹 2) nom de l’annonce
+                // 🔹 2) titre de l’annonce
                 if (normalizedTitle.includes(normalizedQuery)) {
                     score += 100;
                 }
 
-                // 🔹 3) contenu du dernier message (aperçu)
+                // 🔹 3) contenu du dernier message
                 if (normalizedPreview.includes(normalizedQuery)) {
                     score += 50;
                 }
