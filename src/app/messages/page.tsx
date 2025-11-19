@@ -450,7 +450,7 @@ export default function MessagesPage() {
                                 onDelete={() => handleRequestDeleteConversation(selectedConversation)}
                             />
 
-                            <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-2xl bg-muted/40 p-3 text-sm">
+                            <div className="flex-1 space-y-3 overflow-y-auto rounded-2xl bg-muted/40 p-3 text-sm">
                                 {loadingMessages && (
                                     <p className="text-center text-xs text-muted-foreground">
                                         Chargement des messages…
@@ -474,15 +474,9 @@ export default function MessagesPage() {
 
                             <form
                                 onSubmit={handleSendMessage}
-                                className="mt-4 flex items-end gap-3"
+                                className="flex items-end gap-3"
                             >
                                 <div className="flex-1 space-y-1">
-                                    <label
-                                        htmlFor="message"
-                                        className="text-xs text-muted-foreground"
-                                    >
-                                        Votre message
-                                    </label>
                                     <textarea
                                         id="message"
                                         rows={3}
@@ -494,9 +488,13 @@ export default function MessagesPage() {
                                         }
                                     />
                                 </div>
-                                <Button type="submit" className="self-stretch">
+                                <Button
+                                    type="submit"
+                                    className="mb-[6px] h-10 px-4 whitespace-nowrap"
+                                >
                                     Envoyer
                                 </Button>
+
                             </form>
                         </>
                     ) : (
@@ -617,14 +615,15 @@ function ConversationItem({
             </div>
 
             <div className="flex items-center gap-2">
-                <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] text-muted-foreground">
-                        {conversation.updatedAt}
-                    </span>
+                <div className="flex items-center gap-2">
+    <span className="text-[10px] text-muted-foreground">
+        {conversation.updatedAt}
+    </span>
                     {conversation.unreadCount > 0 && (
-                        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-foreground/10 px-1 text-[10px] font-medium text-foreground">
-                            {conversation.unreadCount}
-                        </span>
+                        <span
+                            className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-foreground/10 px-1 text-[10px] font-medium text-foreground">
+            {conversation.unreadCount}
+        </span>
                     )}
                 </div>
 
@@ -701,20 +700,27 @@ function ThreadHeader({ conversation, onDelete }: ThreadHeaderProps) {
 }
 
 function MessageBubble({ message }: { message: Message }) {
-    const bubbleClasses = message.fromMe
-        ? "ml-auto rounded-2xl rounded-br-sm bg-foreground text-foreground-foreground"
-        : "mr-auto rounded-2xl rounded-bl-sm bg-muted text-foreground";
+    const isMe = message.fromMe;
 
-    const timeClasses = message.fromMe
-        ? "text-[10px] text-muted-foreground/80 text-right"
-        : "text-[10px] text-muted-foreground/80";
+    const bubbleClasses = isMe
+        ? "rounded-2xl rounded-br-sm bg-foreground text-background"
+        : "rounded-2xl rounded-bl-sm bg-muted text-foreground";
 
     return (
-        <div className="max-w-[80%] space-y-1">
-            <div className={`px-3 py-2 text-xs ${bubbleClasses}`}>
+        <div
+            className={`flex items-end gap-2 ${
+                isMe ? "justify-end" : "justify-start"
+            }`}
+        >
+            {/* Bulle */}
+            <div className={`max-w-[75%] p-3 break-words whitespace-pre-wrap ${bubbleClasses}`}>
                 {message.content}
             </div>
-            <p className={timeClasses}>{message.time}</p>
+
+            {/* Heure du message */}
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                {message.time}
+            </span>
         </div>
     );
 }
