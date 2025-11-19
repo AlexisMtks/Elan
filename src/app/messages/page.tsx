@@ -1,43 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { MouseEvent } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { AppModal } from "@/components/modals/app-modal";
-import { AppIcon } from "@/components/misc/app-icon";
-import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
-type ConversationId = number;
-
-interface Conversation {
-    id: ConversationId;
-    contactName: string;
-    contactProfileId: string | null;
-    productTitle: string;
-    listingId: string | null;
-    lastMessagePreview: string | null;
-    updatedAt: string;
-    unreadCount: number;
-    buyerId: string;
-    sellerId: string;
-    contactAvatarUrl: string | null;
-    listingPrice: number | null;
-    messagesSearchText: string;
-    lastMessageAt: string | null; // ✅ nouveau
-}
-
-interface Message {
-    id: string;
-    fromMe: boolean;
-    content: string;
-    time: string;
-}
+import type { Conversation, ConversationId, Message } from "@/types/messages";
+import { ConversationItem } from "@/components/messages/conversation-item";
+import { ThreadHeader } from "@/components/messages/thread-header";
+import { MessageBubble } from "@/components/messages/message-bubble";
 
 // Normalise une relation Supabase (objet ou tableau) en un seul objet
 function normalizeRelation<T = any>(rel: any): T | null {
@@ -49,8 +27,8 @@ function normalizeRelation<T = any>(rel: any): T | null {
 function normalizeText(value: string): string {
     if (!value) return "";
     return value
-        .normalize("NFD") // décompose les accents
-        .replace(/[\u0300-\u036f]/g, "") // supprime les diacritiques
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase();
 }
 
@@ -58,7 +36,6 @@ function normalizeText(value: string): string {
 function extractPriceRaw(query: string): string | null {
     const match = query.match(/(\d+(?:[.,]\d+)?)[\s]*([€$£])/);
     if (!match) return null;
-    // on garde la partie numérique sans formattage spécial
     return match[1].replace(",", ".");
 }
 
@@ -77,7 +54,6 @@ function formatConversationTimestamp(
     const hh = String(date.getHours()).padStart(2, "0");
     const min = String(date.getMinutes()).padStart(2, "0");
 
-    // JJ/MM/AAAA HH:MM
     return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
 }
 
@@ -90,7 +66,8 @@ export default function MessagesPage() {
     const router = useRouter();
 
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [selectedConversationId, setSelectedConversationId] = useState<ConversationId | null>(null);
+    const [selectedConversationId, setSelectedConversationId] =
+        useState<ConversationId | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [messageInput, setMessageInput] = useState("");
     const [loadingConversations, setLoadingConversations] = useState(false);
@@ -107,7 +84,6 @@ export default function MessagesPage() {
     const markConversationAsRead = async (conversationId: ConversationId) => {
         if (!user) return;
 
-        // on récupère la conversation pour savoir si on est buyer ou seller
         const { data: conv, error } = await supabase
             .from("conversations")
             .select("id, buyer_id, seller_id")
@@ -127,7 +103,6 @@ export default function MessagesPage() {
         } else if (conv.seller_id === user.id) {
             updates.last_read_at_seller = now;
         } else {
-            // l'utilisateur n'est ni buyer, ni seller → on ne touche pas
             return;
         }
 
@@ -141,7 +116,6 @@ export default function MessagesPage() {
             return;
         }
 
-        // Mise à jour optimiste du state local
         setConversations((prev) =>
             prev.map((c) =>
                 c.id === conversationId
@@ -169,13 +143,11 @@ export default function MessagesPage() {
         const syncConversations = async () => {
             setLoadingConversations(true);
 
-            // 1) Si on vient d'une annonce (seller + listing dans l'URL), on s'assure
-            //    qu'une conversation existe pour (buyer = user.id, seller = querySellerId, listing = queryListingId)
             if (
                 querySellerId &&
                 queryListingId &&
                 !conversationCreated &&
-                querySellerId !== user.id // on ne crée pas de conversation avec soi-même
+                querySellerId !== user.id
             ) {
                 try {
                     const { data: existing, error: existingError } = await supabase
@@ -216,35 +188,34 @@ export default function MessagesPage() {
                 }
             }
 
-            // 2) On (re)charge toutes les conversations de l'utilisateur
             const { data: convData, error: convError } = await supabase
                 .from("conversations")
                 .select(
                     `
-                      id,
-                      buyer_id,
-                      seller_id,
-                      listing_id,
-                      last_message_at,
-                      last_message_preview,
-                      last_read_at_buyer,
-                      last_read_at_seller,
-                      listing:listings (
-                        id,
-                        title,
-                        price
-                      ),
-                      buyer:profiles!conversations_buyer_id_fkey (
-                        id,
-                        display_name,
-                        avatar_url
-                      ),
-                      seller:profiles!conversations_seller_id_fkey (
-                        id,
-                        display_name,
-                        avatar_url
-                      )
-                    `,
+            id,
+            buyer_id,
+            seller_id,
+            listing_id,
+            last_message_at,
+            last_message_preview,
+            last_read_at_buyer,
+            last_read_at_seller,
+            listing:listings (
+              id,
+              title,
+              price
+            ),
+            buyer:profiles!conversations_buyer_id_fkey (
+              id,
+              display_name,
+              avatar_url
+            ),
+            seller:profiles!conversations_seller_id_fkey (
+              id,
+              display_name,
+              avatar_url
+            )
+          `,
                 )
                 .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
                 .order("last_message_at", { ascending: false });
@@ -257,14 +228,15 @@ export default function MessagesPage() {
 
             const conversationsRaw = convData ?? [];
 
-            // 👉 On récupère tous les ids de conversation
-            const conversationIds = conversationsRaw.map((c: any) => c.id).filter(Boolean);
+            const conversationIds = conversationsRaw
+                .map((c: any) => c.id)
+                .filter(Boolean) as number[];
 
             type MessagesAggregate = {
                 [conversationId: number]: {
-                    text: string;                 // concat des contenus pour la recherche
-                    count: number;                // nombre total de messages
-                    lastCreatedAt: string | null; // date du dernier message (reçu ou envoyé)
+                    text: string;
+                    count: number;
+                    lastCreatedAt: string | null;
                     messages: {
                         senderId: string;
                         createdAt: string;
@@ -303,14 +275,16 @@ export default function MessagesPage() {
 
                         messagesAggregate[convId].text += ` ${m.content ?? ""}`;
                         messagesAggregate[convId].count += 1;
-
                         messagesAggregate[convId].messages.push({
                             senderId: m.sender_id as string,
                             createdAt,
                             content: m.content ?? "",
                         });
 
-                        if (!messagesAggregate[convId].lastCreatedAt || createdAt > messagesAggregate[convId].lastCreatedAt!) {
+                        if (
+                            !messagesAggregate[convId].lastCreatedAt ||
+                            createdAt > messagesAggregate[convId].lastCreatedAt!
+                        ) {
                             messagesAggregate[convId].lastCreatedAt = createdAt;
                         }
                     }
@@ -339,14 +313,12 @@ export default function MessagesPage() {
                 const lastTimestamp: string | Date | null =
                     (conv.last_message_at as string | null) ?? aggregate.lastCreatedAt;
 
-                // 🧮 calcul du nombre de messages reçus non lus
                 const lastReadAt: string | null = isCurrentUserSeller
                     ? (conv.last_read_at_seller as string | null)
                     : (conv.last_read_at_buyer as string | null);
 
                 let unreadCount = 0;
                 for (const msg of aggregate.messages) {
-                    // message reçu (pas envoyé par moi)
                     if (msg.senderId !== user.id) {
                         if (!lastReadAt || msg.createdAt > lastReadAt) {
                             unreadCount++;
@@ -363,7 +335,7 @@ export default function MessagesPage() {
                     lastMessagePreview: conv.last_message_preview as string | null,
                     updatedAt: formatConversationTimestamp(lastTimestamp),
                     lastMessageAt: conv.last_message_at ?? aggregate.lastCreatedAt ?? null,
-                    unreadCount, // ✅ maintenant c'est un vrai "non lu"
+                    unreadCount,
                     buyerId: conv.buyer_id,
                     sellerId: conv.seller_id,
                     contactAvatarUrl: contactProfile?.avatar_url ?? null,
@@ -374,19 +346,15 @@ export default function MessagesPage() {
 
             setConversations(formatted);
 
-            // 3) Choix de la conversation à sélectionner
             let initialConversationId: ConversationId | null =
                 formatted.length > 0 ? formatted[0].id : null;
 
-            // Si on a des query params, on essaye de matcher LA conversation correspondante à l'annonce
             if (querySellerId && queryListingId) {
                 const matched = formatted.find(
                     (conv) =>
                         conv.listingId === queryListingId &&
-                        ((conv.buyerId === user.id &&
-                                conv.sellerId === querySellerId) ||
-                            (conv.sellerId === user.id &&
-                                conv.buyerId === querySellerId)),
+                        ((conv.buyerId === user.id && conv.sellerId === querySellerId) ||
+                            (conv.sellerId === user.id && conv.buyerId === querySellerId)),
                 );
 
                 if (matched) {
@@ -404,7 +372,6 @@ export default function MessagesPage() {
         syncConversations();
     }, [user, querySellerId, queryListingId, conversationCreated]);
 
-    // 🔹 Charger les messages de la conversation sélectionnée
     useEffect(() => {
         if (!user || !selectedConversationId) return;
 
@@ -436,14 +403,13 @@ export default function MessagesPage() {
             setMessages(formatted);
             setLoadingMessages(false);
 
-            // ✅ marquer la conversation comme lue pour l'utilisateur courant
             await markConversationAsRead(selectedConversationId);
         };
 
         fetchMessages();
     }, [user, selectedConversationId]);
 
-    const handleSendMessage = async (e: React.FormEvent) => {
+    const handleSendMessage = async (e: FormEvent) => {
         e.preventDefault();
         if (!messageInput.trim()) return;
         if (!user || !selectedConversationId) return;
@@ -477,11 +443,9 @@ export default function MessagesPage() {
             }),
         };
 
-        // Ajout dans le fil local
         setMessages((prev) => [...prev, newMessage]);
         setMessageInput("");
 
-        // MAJ rapide des métadonnées de la conversation (pour l’UI + recherche)
         setConversations((prev) =>
             prev.map((c) =>
                 c.id === selectedConversationId
@@ -491,7 +455,6 @@ export default function MessagesPage() {
                         updatedAt: formatConversationTimestamp(sentAt),
                         lastMessageAt: sentAt.toISOString(),
                         messagesSearchText: `${c.messagesSearchText ?? ""} ${newMessage.content}`,
-                        // ✅ on ne modifie pas unreadCount côté utilisateur courant
                         unreadCount: c.unreadCount,
                     }
                     : c,
@@ -503,13 +466,11 @@ export default function MessagesPage() {
         (c) => c.id === selectedConversationId,
     );
 
-    // Demande de suppression (ouvre le pop-up)
     const handleRequestDeleteConversation = (conversation: Conversation) => {
         setConversationToDelete(conversation);
         setDeleteModalOpen(true);
     };
 
-    // Confirmation de suppression (appel Supabase)
     const handleConfirmDeleteConversation = async () => {
         if (!conversationToDelete || !user) return;
 
@@ -517,7 +478,6 @@ export default function MessagesPage() {
 
         const conversationId = conversationToDelete.id;
 
-        // 1) Supprimer les messages liés (si pas de cascade en DB)
         const { error: messagesError } = await supabase
             .from("messages")
             .delete()
@@ -526,14 +486,12 @@ export default function MessagesPage() {
         if (messagesError) {
             console.error(
                 "Erreur suppression messages de la conversation :",
-                messagesError
+                messagesError,
             );
-            // On ne touche pas au state React si la DB n'a pas été modifiée
             setIsDeleting(false);
             return;
         }
 
-        // 2) Supprimer la conversation
         const { error: convError } = await supabase
             .from("conversations")
             .delete()
@@ -541,37 +499,28 @@ export default function MessagesPage() {
 
         if (convError) {
             console.error("Erreur suppression conversation :", convError);
-            // Idem, on ne met pas à jour le state
             setIsDeleting(false);
             return;
         }
 
-        // 3) Ici, on est sûr que la suppression en base est OK → on met l'UI à jour
-
-        // vider le fil
         setMessages([]);
 
-        // mettre à jour la liste + sélectionner une autre conversation si dispo
         setConversations((prev) => {
             const updated = prev.filter((c) => c.id !== conversationId);
             setSelectedConversationId(updated.length > 0 ? updated[0].id : null);
             return updated;
         });
 
-        // nettoyer les query params dans le state
         setQuerySellerId(null);
         setQueryListingId(null);
 
-        // nettoyer l’URL
         router.replace("/messages");
 
-        // fermer la modal et reset
         setIsDeleting(false);
         setDeleteModalOpen(false);
         setConversationToDelete(null);
     };
 
-    // ÉTATS D’AUTH
     if (checking) {
         return (
             <p className="text-sm text-muted-foreground">
@@ -615,26 +564,21 @@ export default function MessagesPage() {
 
                 let score = 0;
 
-                // 🔹 priorité montant s’il est présent dans la recherche
                 if (queryPrice !== null && conv.listingPrice !== null) {
-                    const convPrice = conv.listingPrice / 100; // centimes -> €
+                    const convPrice = conv.listingPrice / 100;
                     if (Math.abs(convPrice - queryPrice) < 0.01) {
-                        // 50.00 vs 50 => match
-                        score += 400; // priorité max
+                        score += 400;
                     }
                 }
 
-                // 🔹 1) nom d’utilisateur
                 if (normalizedName.includes(normalizedQuery)) {
                     score += 200;
                 }
 
-                // 🔹 2) titre de l’annonce
                 if (normalizedTitle.includes(normalizedQuery)) {
                     score += 100;
                 }
 
-                // 🔹 3) contenu du dernier message
                 if (normalizedMessages.includes(normalizedQuery)) {
                     score += 50;
                 }
@@ -653,7 +597,6 @@ export default function MessagesPage() {
         setSearchResults([]);
     };
 
-    // Ici, on est sûr d’avoir un user authentifié
     return (
         <>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.6fr)]">
@@ -694,7 +637,7 @@ export default function MessagesPage() {
                             </p>
                         )}
 
-                        {/* 🔍 Résultats de recherche */}
+                        {/* Résultats de recherche */}
                         {searchTerm.trim() && !loadingConversations && (
                             <>
                                 {searchResults.length === 0 ? (
@@ -714,7 +657,7 @@ export default function MessagesPage() {
                                                 onDelete={() =>
                                                     handleRequestDeleteConversation(conversation)
                                                 }
-                                                highlightTerm={searchTerm} // ✅ ici
+                                                highlightTerm={searchTerm}
                                             />
                                         ))}
                                     </div>
@@ -724,7 +667,7 @@ export default function MessagesPage() {
                             </>
                         )}
 
-                        {/* 🔁 Liste complète, toujours affichée dessous, triée par dernier message */}
+                        {/* Liste complète triée par dernier message */}
                         {!loadingConversations &&
                             [...conversations]
                                 .sort((a, b) => {
@@ -742,7 +685,9 @@ export default function MessagesPage() {
                                         conversation={conversation}
                                         isActive={conversation.id === selectedConversationId}
                                         onSelect={() => setSelectedConversationId(conversation.id)}
-                                        onDelete={() => handleRequestDeleteConversation(conversation)}
+                                        onDelete={() =>
+                                            handleRequestDeleteConversation(conversation)
+                                        }
                                     />
                                 ))}
                     </div>
@@ -754,7 +699,9 @@ export default function MessagesPage() {
                         <>
                             <ThreadHeader
                                 conversation={selectedConversation}
-                                onDelete={() => handleRequestDeleteConversation(selectedConversation)}
+                                onDelete={() =>
+                                    handleRequestDeleteConversation(selectedConversation)
+                                }
                             />
 
                             <div className="flex-1 space-y-3 overflow-y-auto rounded-2xl bg-muted/40 p-3 text-sm">
@@ -766,10 +713,7 @@ export default function MessagesPage() {
 
                                 {!loadingMessages &&
                                     messages.map((message) => (
-                                        <MessageBubble
-                                            key={message.id}
-                                            message={message}
-                                        />
+                                        <MessageBubble key={message.id} message={message} />
                                     ))}
 
                                 {!loadingMessages && messages.length === 0 && (
@@ -784,24 +728,21 @@ export default function MessagesPage() {
                                 className="flex items-end gap-3"
                             >
                                 <div className="flex-1 space-y-1">
-                                    <textarea
-                                        id="message"
-                                        rows={3}
-                                        className="w-full resize-none rounded-xl border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        placeholder="Écrivez votre message..."
-                                        value={messageInput}
-                                        onChange={(e) =>
-                                            setMessageInput(e.target.value)
-                                        }
-                                    />
+                  <textarea
+                      id="message"
+                      rows={3}
+                      className="w-full resize-none rounded-xl border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Écrivez votre message..."
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                  />
                                 </div>
                                 <Button
                                     type="submit"
-                                    className="mb-[6px] h-10 px-4 whitespace-nowrap"
+                                    className="mb-[6px] h-10 whitespace-nowrap px-4"
                                 >
                                     Envoyer
                                 </Button>
-
                             </form>
                         </>
                     ) : (
@@ -857,279 +798,5 @@ export default function MessagesPage() {
                 </p>
             </AppModal>
         </>
-    );
-}
-
-interface ConversationItemProps {
-    conversation: Conversation;
-    isActive: boolean;
-    onSelect: () => void;
-    onDelete: () => void;
-    highlightTerm?: string;
-}
-
-function ConversationItem({
-                              conversation,
-                              isActive,
-                              onSelect,
-                              onDelete,
-                              highlightTerm,
-                          }: ConversationItemProps) {
-    const initials =
-        conversation.contactName
-            .split(" ")
-            .map((n) => n[0])
-            .join("")
-            .toUpperCase() || "EL";
-
-    const hasUnread = conversation.unreadCount > 0;
-
-    const buildSnippet = (text: string, term?: string, max = 40) => {
-        if (!text) return "";
-        if (text.length <= max) return text;
-
-        const cleanTerm = term?.trim();
-        if (!cleanTerm) {
-            return text.slice(0, max) + "…";
-        }
-
-        const lowerText = text.toLowerCase();
-        const lowerTerm = cleanTerm.toLowerCase();
-
-        const index = lowerText.indexOf(lowerTerm);
-        if (index === -1) {
-            // on ne trouve pas le terme → fallback classique
-            return text.slice(0, max) + "…";
-        }
-
-        const half = Math.floor((max - lowerTerm.length) / 2);
-        let start = Math.max(0, index - half);
-        let end = Math.min(text.length, start + max);
-
-        // petit ajustement si on est proche de la fin
-        if (end - start < max && start > 0) {
-            start = Math.max(0, end - max);
-        }
-
-        let snippet = text.slice(start, end);
-        if (start > 0) snippet = "…" + snippet;
-        if (end < text.length) snippet = snippet + "…";
-
-        return snippet;
-    };
-
-    const handleDeleteClick = (event: MouseEvent<HTMLButtonElement>) => {
-        event.stopPropagation(); // ✅ n’active pas le onSelect
-        onDelete();
-    };
-
-    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-        if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onSelect();
-        }
-    };
-
-    const highlightMatch = (text: string, term?: string) => {
-        if (!term?.trim()) return text;
-
-        const lowerText = text.toLowerCase();
-        const lowerTerm = term.toLowerCase();
-
-        const index = lowerText.indexOf(lowerTerm);
-        if (index === -1) return text;
-
-        const end = index + lowerTerm.length;
-
-        return (
-            <>
-                {text.slice(0, index)}
-                <span className="rounded-sm bg-amber-100 px-[2px]">
-                {text.slice(index, end)}
-            </span>
-                {text.slice(end)}
-            </>
-        );
-    };
-
-    return (
-        <div
-            role="button"
-            tabIndex={0}
-            onClick={onSelect}
-            onKeyDown={handleKeyDown}
-            className={[
-                "flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-xs transition",
-                isActive
-                    ? "border-foreground bg-foreground/10 shadow-sm"
-                    : hasUnread
-                        ? "border-foreground/40"
-                        : "border-transparent hover:bg-muted/60",
-            ].join(" ")}
-        >
-            <div className="flex items-center gap-2">
-                {hasUnread && !isActive && (
-                    <span
-                        className="h-2 w-2 rounded-full bg-foreground"
-                        aria-hidden="true"
-                    />
-                )}
-
-                <Avatar className="h-8 w-8">
-                    {conversation.contactAvatarUrl && (
-                        <AvatarImage
-                            src={conversation.contactAvatarUrl}
-                            alt={conversation.contactName}
-                        />
-                    )}
-                    <AvatarFallback>{initials}</AvatarFallback>
-                </Avatar>
-            </div>
-
-            <div className="flex-1 space-y-0.5">
-                <p className={`text-xs ${hasUnread ? "font-semibold" : "font-medium"}`}>
-                    {highlightMatch(conversation.contactName, highlightTerm)}
-                </p>
-
-                {/* 🔍 Ligne 2 : en recherche → extrait du message, sinon titre de l'annonce */}
-                <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                    {highlightTerm
-                        ? highlightMatch(
-                            buildSnippet(
-                                conversation.messagesSearchText ?? "",
-                                highlightTerm,
-                                40
-                            ),
-                            highlightTerm
-                        )
-                        : highlightMatch(conversation.productTitle, highlightTerm)}
-                </p>
-
-                {/* Ligne 3 : on garde le dernier message comme avant */}
-                {conversation.lastMessagePreview && (
-                    <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                        {highlightMatch(
-                            buildSnippet(
-                                conversation.lastMessagePreview,
-                                highlightTerm,
-                                40,
-                            ),
-                            highlightTerm,
-                        )}
-                    </p>
-                )}
-            </div>
-
-            <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2">
-                    {conversation.unreadCount > 0 && (
-                        <span
-                            className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-foreground/10 px-1 text-[10px] font-medium text-foreground">
-                            {conversation.unreadCount}
-                        </span>
-                    )}
-                    <span className="text-[10px] text-muted-foreground">
-                        {conversation.updatedAt}
-                    </span>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={handleDeleteClick}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
-                    aria-label="Supprimer cette conversation"
-                >
-                    <AppIcon name="trash" size={14}/>
-                </button>
-            </div>
-        </div>
-    );
-}
-
-
-interface ThreadHeaderProps {
-    conversation: Conversation;
-    onDelete: () => void;
-}
-
-function ThreadHeader({conversation, onDelete}: ThreadHeaderProps) {
-    const router = useRouter();
-
-    const initials =
-        conversation.contactName
-            .split(" ")
-            .map((n) => n[0])
-            .join("")
-            .toUpperCase() || "EL";
-
-    const handleViewListing = () => {
-        if (conversation.listingId) {
-            router.push(`/listings/${conversation.listingId}`);
-        }
-    };
-
-    return (
-        <div className="flex items-center justify-between gap-4 border-b pb-3">
-            <div className="flex items-center gap-3">
-                <Avatar className="h-9 w-9">
-                    {conversation.contactAvatarUrl && (
-                        <AvatarImage src={conversation.contactAvatarUrl} alt={conversation.contactName} />
-                    )}
-                    <AvatarFallback>{initials}</AvatarFallback>
-                </Avatar>
-                <div className="space-y-0.5 text-sm">
-                    <p className="font-medium">{conversation.contactName}</p>
-                    <p className="text-xs text-muted-foreground">
-                        À propos de : {conversation.productTitle}
-                    </p>
-                </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleViewListing}
-                >
-                    Voir l’annonce
-                </Button>
-
-                <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={onDelete}
-                >
-                    Supprimer
-                </Button>
-            </div>
-        </div>
-    );
-}
-
-function MessageBubble({ message }: { message: Message }) {
-    const isMe = message.fromMe;
-
-    const bubbleClasses = isMe
-        ? "rounded-2xl rounded-br-sm bg-foreground text-background"
-        : "rounded-2xl rounded-bl-sm bg-muted text-foreground";
-
-    return (
-        <div
-            className={`flex items-end gap-2 ${
-                isMe ? "justify-end" : "justify-start"
-            }`}
-        >
-            {/* Bulle */}
-            <div className={`max-w-[75%] p-3 break-words whitespace-pre-wrap ${bubbleClasses}`}>
-                {message.content}
-            </div>
-
-            {/* Heure du message */}
-            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                {message.time}
-            </span>
-        </div>
     );
 }

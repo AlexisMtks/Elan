@@ -111,7 +111,7 @@ Fichiers créés / modifiés :
 - `src/app/globals.css` (variables CSS)
 - `tailwind.config.ts` (config mise à jour)
 
-Message final :
+Messages final :
 ```
 Success! Project initialization completed.
 You may now add components.

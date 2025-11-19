@@ -471,7 +471,7 @@ export function SellForm({
                         </div>
                     )}
 
-                    {/* Message d'erreur */}
+                    {/* Messages d'erreur */}
                     {errorMsg && (
                         <p className="text-sm text-red-500">{errorMsg}</p>
                     )}
