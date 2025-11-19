@@ -49,50 +49,67 @@ export function Header({ variant = "default" }: HeaderProps) {
           pathname.startsWith(p),
       );
 
-  // Déterminer si l’utilisateur est connecté + charger son avatar au chargement
-  useEffect(() => {
-    async function checkAuthAndProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  // Chargement du user + profil (avatar / initiales)
+  const loadUserAndProfile = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      if (!user) {
+    if (!user) {
+      setIsAuthenticated(false);
+      setAvatarUrl(null);
+      setAvatarInitials("ME");
+      return;
+    }
+
+    setIsAuthenticated(true);
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("avatar_url, display_name, first_name, last_name")
+        .eq("id", user.id)
+        .single();
+
+    if (profile?.avatar_url) {
+      setAvatarUrl(profile.avatar_url);
+    } else {
+      setAvatarUrl(null);
+    }
+
+    const baseName =
+        profile?.display_name ||
+        [profile?.first_name, profile?.last_name]
+            .filter(Boolean)
+            .join(" ")
+            .trim() ||
+        user.email ||
+        "ME";
+
+    const initials = getInitials(baseName);
+    setAvatarInitials(initials || "ME");
+  };
+
+  // Déterminer si l’utilisateur est connecté + écouter les changements d’auth
+  useEffect(() => {
+    // check initial
+    void loadUserAndProfile();
+
+    // écoute login/logout
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        void loadUserAndProfile();
+      } else {
         setIsAuthenticated(false);
         setAvatarUrl(null);
         setAvatarInitials("ME");
-        return;
       }
+    });
 
-      setIsAuthenticated(true);
-
-      // Récupération du profil pour l’avatar
-      const { data: profile } = await supabase
-          .from("profiles")
-          .select("avatar_url, display_name, first_name, last_name")
-          .eq("id", user.id)
-          .single();
-
-      if (profile?.avatar_url) {
-        setAvatarUrl(profile.avatar_url);
-      } else {
-        setAvatarUrl(null);
-      }
-
-      // Initiales pour le fallback (display_name > prénom/nom > email > ME)
-      const baseName =
-          profile?.display_name ||
-          [profile?.first_name, profile?.last_name]
-              .filter(Boolean)
-              .join(" ")
-              .trim() ||
-          user.email ||
-          "ME";
-
-      const initials = getInitials(baseName);
-      setAvatarInitials(initials || "ME");
-    }
-
-    void checkAuthAndProfile();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // ✅ Écouter les mises à jour d'avatar provenant de /account
@@ -157,7 +174,7 @@ export function Header({ variant = "default" }: HeaderProps) {
           <Link href="/" className="flex items-center">
             {/* LOGO MOBILE */}
             <span className="md:hidden flex items-center">
-              {/* version claire */}
+            {/* version claire */}
               <Image
                   src="/logos/logo-light.png"
                   alt="Élan"
@@ -175,11 +192,11 @@ export function Header({ variant = "default" }: HeaderProps) {
                   className="hidden dark:block h-8 w-auto -translate-y-[2px]"
                   priority
               />
-            </span>
+          </span>
 
             {/* LOGO DESKTOP */}
             <span className="hidden md:flex items-center">
-             {/* version claire */}
+            {/* version claire */}
               <Image
                   src="/logos/logo-light.png"
                   alt="Élan"
@@ -197,7 +214,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                   className="hidden dark:block h-9 w-auto -translate-y-[2px]"
                   priority
               />
-            </span>
+          </span>
           </Link>
 
           {/* Barre de recherche */}
