@@ -104,6 +104,53 @@ export default function MessagesPage() {
         useState<Conversation | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    const markConversationAsRead = async (conversationId: ConversationId) => {
+        if (!user) return;
+
+        // on récupère la conversation pour savoir si on est buyer ou seller
+        const { data: conv, error } = await supabase
+            .from("conversations")
+            .select("id, buyer_id, seller_id")
+            .eq("id", conversationId)
+            .maybeSingle();
+
+        if (error || !conv) {
+            console.error("Erreur récupération conversation pour read_at :", error);
+            return;
+        }
+
+        const now = new Date().toISOString();
+        const updates: Record<string, string> = {};
+
+        if (conv.buyer_id === user.id) {
+            updates.last_read_at_buyer = now;
+        } else if (conv.seller_id === user.id) {
+            updates.last_read_at_seller = now;
+        } else {
+            // l'utilisateur n'est ni buyer, ni seller → on ne touche pas
+            return;
+        }
+
+        const { error: updateError } = await supabase
+            .from("conversations")
+            .update(updates)
+            .eq("id", conversationId);
+
+        if (updateError) {
+            console.error("Erreur MAJ last_read_at :", updateError);
+            return;
+        }
+
+        // Mise à jour optimiste du state local
+        setConversations((prev) =>
+            prev.map((c) =>
+                c.id === conversationId
+                    ? { ...c, unreadCount: 0 }
+                    : c,
+            ),
+        );
+    };
+
     // Lecture des query params côté client
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -174,28 +221,30 @@ export default function MessagesPage() {
                 .from("conversations")
                 .select(
                     `
-      id,
-      buyer_id,
-      seller_id,
-      listing_id,
-      last_message_at,
-      last_message_preview,
-      listing:listings (
-        id,
-        title,
-        price
-      ),
-      buyer:profiles!conversations_buyer_id_fkey (
-        id,
-        display_name,
-        avatar_url
-      ),
-      seller:profiles!conversations_seller_id_fkey (
-        id,
-        display_name,
-        avatar_url
-      )
-    `,
+                      id,
+                      buyer_id,
+                      seller_id,
+                      listing_id,
+                      last_message_at,
+                      last_message_preview,
+                      last_read_at_buyer,
+                      last_read_at_seller,
+                      listing:listings (
+                        id,
+                        title,
+                        price
+                      ),
+                      buyer:profiles!conversations_buyer_id_fkey (
+                        id,
+                        display_name,
+                        avatar_url
+                      ),
+                      seller:profiles!conversations_seller_id_fkey (
+                        id,
+                        display_name,
+                        avatar_url
+                      )
+                    `,
                 )
                 .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
                 .order("last_message_at", { ascending: false });
@@ -213,9 +262,14 @@ export default function MessagesPage() {
 
             type MessagesAggregate = {
                 [conversationId: number]: {
-                    text: string;         // concat des contenus pour la recherche
-                    count: number;        // nombre de messages
+                    text: string;                 // concat des contenus pour la recherche
+                    count: number;                // nombre total de messages
                     lastCreatedAt: string | null; // date du dernier message (reçu ou envoyé)
+                    messages: {
+                        senderId: string;
+                        createdAt: string;
+                        content: string;
+                    }[];
                 };
             };
 
@@ -224,7 +278,7 @@ export default function MessagesPage() {
             if (conversationIds.length > 0) {
                 const { data: messagesData, error: messagesError } = await supabase
                     .from("messages")
-                    .select("conversation_id, content, created_at")
+                    .select("conversation_id, sender_id, content, created_at")
                     .in("conversation_id", conversationIds);
 
                 if (messagesError) {
@@ -241,20 +295,23 @@ export default function MessagesPage() {
                                 text: "",
                                 count: 0,
                                 lastCreatedAt: null,
+                                messages: [],
                             };
                         }
 
-                        const createdAt = m.created_at as string | null;
+                        const createdAt = m.created_at as string;
 
                         messagesAggregate[convId].text += ` ${m.content ?? ""}`;
                         messagesAggregate[convId].count += 1;
 
-                        // on garde la date du dernier message
-                        if (createdAt) {
-                            const current = messagesAggregate[convId].lastCreatedAt;
-                            if (!current || createdAt > current) {
-                                messagesAggregate[convId].lastCreatedAt = createdAt;
-                            }
+                        messagesAggregate[convId].messages.push({
+                            senderId: m.sender_id as string,
+                            createdAt,
+                            content: m.content ?? "",
+                        });
+
+                        if (!messagesAggregate[convId].lastCreatedAt || createdAt > messagesAggregate[convId].lastCreatedAt!) {
+                            messagesAggregate[convId].lastCreatedAt = createdAt;
                         }
                     }
                 }
@@ -276,11 +333,26 @@ export default function MessagesPage() {
                     text: "",
                     count: 0,
                     lastCreatedAt: null,
+                    messages: [],
                 };
 
-                // on prend d’abord last_message_at si présent, sinon la date du dernier message
                 const lastTimestamp: string | Date | null =
                     (conv.last_message_at as string | null) ?? aggregate.lastCreatedAt;
+
+                // 🧮 calcul du nombre de messages reçus non lus
+                const lastReadAt: string | null = isCurrentUserSeller
+                    ? (conv.last_read_at_seller as string | null)
+                    : (conv.last_read_at_buyer as string | null);
+
+                let unreadCount = 0;
+                for (const msg of aggregate.messages) {
+                    // message reçu (pas envoyé par moi)
+                    if (msg.senderId !== user.id) {
+                        if (!lastReadAt || msg.createdAt > lastReadAt) {
+                            unreadCount++;
+                        }
+                    }
+                }
 
                 return {
                     id: conv.id as number,
@@ -289,9 +361,9 @@ export default function MessagesPage() {
                     productTitle: listingRow?.title ?? "Annonce supprimée",
                     listingId: conv.listing_id ?? listingRow?.id ?? null,
                     lastMessagePreview: conv.last_message_preview as string | null,
-                    updatedAt: formatConversationTimestamp(conv.last_message_at),
-                    lastMessageAt: conv.last_message_at ?? null,            // ✅ ici
-                    unreadCount: aggregate.count,
+                    updatedAt: formatConversationTimestamp(lastTimestamp),
+                    lastMessageAt: conv.last_message_at ?? aggregate.lastCreatedAt ?? null,
+                    unreadCount, // ✅ maintenant c'est un vrai "non lu"
                     buyerId: conv.buyer_id,
                     sellerId: conv.seller_id,
                     contactAvatarUrl: contactProfile?.avatar_url ?? null,
@@ -363,6 +435,9 @@ export default function MessagesPage() {
 
             setMessages(formatted);
             setLoadingMessages(false);
+
+            // ✅ marquer la conversation comme lue pour l'utilisateur courant
+            await markConversationAsRead(selectedConversationId);
         };
 
         fetchMessages();
@@ -414,9 +489,10 @@ export default function MessagesPage() {
                         ...c,
                         lastMessagePreview: newMessage.content,
                         updatedAt: formatConversationTimestamp(sentAt),
-                        lastMessageAt: sentAt.toISOString(), // ✅ pour le tri
+                        lastMessageAt: sentAt.toISOString(),
                         messagesSearchText: `${c.messagesSearchText ?? ""} ${newMessage.content}`,
-                        unreadCount: c.unreadCount + 1,
+                        // ✅ on ne modifie pas unreadCount côté utilisateur courant
+                        unreadCount: c.unreadCount,
                     }
                     : c,
             ),
@@ -806,6 +882,8 @@ function ConversationItem({
             .join("")
             .toUpperCase() || "EL";
 
+    const hasUnread = conversation.unreadCount > 0;
+
     const buildSnippet = (text: string, term?: string, max = 40) => {
         if (!text) return "";
         if (text.length <= max) return text;
@@ -883,19 +961,33 @@ function ConversationItem({
             className={[
                 "flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-xs transition",
                 isActive
-                    ? "border-foreground bg-foreground/5"
-                    : "border-transparent hover:bg-muted/60",
+                    ? "border-foreground bg-foreground/10 shadow-sm"
+                    : hasUnread
+                        ? "border-foreground/40"
+                        : "border-transparent hover:bg-muted/60",
             ].join(" ")}
         >
-            <Avatar className="h-8 w-8">
-                {conversation.contactAvatarUrl && (
-                    <AvatarImage src={conversation.contactAvatarUrl} alt={conversation.contactName} />
+            <div className="flex items-center gap-2">
+                {hasUnread && !isActive && (
+                    <span
+                        className="h-2 w-2 rounded-full bg-foreground"
+                        aria-hidden="true"
+                    />
                 )}
-                <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
+
+                <Avatar className="h-8 w-8">
+                    {conversation.contactAvatarUrl && (
+                        <AvatarImage
+                            src={conversation.contactAvatarUrl}
+                            alt={conversation.contactName}
+                        />
+                    )}
+                    <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+            </div>
 
             <div className="flex-1 space-y-0.5">
-                <p className="text-xs font-medium">
+                <p className={`text-xs ${hasUnread ? "font-semibold" : "font-medium"}`}>
                     {highlightMatch(conversation.contactName, highlightTerm)}
                 </p>
 
@@ -930,15 +1022,15 @@ function ConversationItem({
 
             <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-muted-foreground">
-                        {conversation.updatedAt}
-                    </span>
                     {conversation.unreadCount > 0 && (
                         <span
                             className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-foreground/10 px-1 text-[10px] font-medium text-foreground">
                             {conversation.unreadCount}
                         </span>
                     )}
+                    <span className="text-[10px] text-muted-foreground">
+                        {conversation.updatedAt}
+                    </span>
                 </div>
 
                 <button
@@ -947,7 +1039,7 @@ function ConversationItem({
                     className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
                     aria-label="Supprimer cette conversation"
                 >
-                    <AppIcon name="trash" size={14} />
+                    <AppIcon name="trash" size={14}/>
                 </button>
             </div>
         </div>
@@ -960,7 +1052,7 @@ interface ThreadHeaderProps {
     onDelete: () => void;
 }
 
-function ThreadHeader({ conversation, onDelete }: ThreadHeaderProps) {
+function ThreadHeader({conversation, onDelete}: ThreadHeaderProps) {
     const router = useRouter();
 
     const initials =
