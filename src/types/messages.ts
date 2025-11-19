@@ -1,3 +1,5 @@
+// src/types/messages.ts
+
 export type ConversationId = number;
 
 export interface Conversation {
@@ -17,9 +19,12 @@ export interface Conversation {
     lastMessageAt: string | null;
 }
 
-export interface Messages {
+export interface Message {
     id: string;
     fromMe: boolean;
     content: string;
     time: string;
 }
+
+// ✅ Alias pour compat avec d’éventuels anciens imports
+export type Messages = Message[];
