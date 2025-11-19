@@ -3,6 +3,7 @@ import { FilterPanel } from "@/components/filters/filter-panel";
 import { FilterChips } from "@/components/filters/filter-chips";
 import { ProductCard } from "@/components/cards/product-card";
 import { PageTitle } from "@/components/misc/page-title";
+import { SearchListingsGrid } from "@/components/listing/search-listings-grid";
 import { supabase } from "@/lib/supabaseClient";
 
 type CategoryValue = "all" | "agres" | "tapis" | "accessoires";
@@ -28,6 +29,7 @@ type ListingRow = {
     title: string;
     price: number; // centimes
     city: string | null;
+    sellerId: string;
     imageUrl?: string;
 };
 
@@ -151,15 +153,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         .from("listings")
         .select(
             `
-        id,
-        title,
-        price,
-        city,
-        listing_images (
-          image_url,
-          position
-        )
-      `,
+                id,
+                title,
+                price,
+                city,
+                seller_id,
+                listing_images (
+                  image_url,
+                  position
+                )
+              `,
             { count: "exact" },
         )
         .eq("status", "active");
@@ -218,6 +221,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             title: row.title,
             price: row.price,
             city: row.city,
+            sellerId: row.seller_id,
             imageUrl: firstImage,
         };
     });
@@ -225,8 +229,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     const total = count ?? listings.length;
 
     const title = query
-        ? `Résultats pour « ${query} » (${total})`
-        : `Toutes les annonces (${total})`;
+        ? `Résultats pour « ${query} »`
+        : "Toutes les annonces";
 
     // ----------------------------
     // 3) Rendu
@@ -235,7 +239,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <div className="flex gap-8">
             <FilterPanel />
 
-            <div className="flex-1 space-y-6">
+            <div className="flex-1 space-y-2">
                 <div className="flex items-start justify-between gap-4">
                     <div className="space-y-3">
                         <PageTitle title={title} />
@@ -253,25 +257,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                     </p>
                 )}
 
-                {listings.length === 0 && !error ? (
-                    <p className="text-sm text-muted-foreground">
-                        Aucun résultat ne correspond à votre recherche.
-                    </p>
-                ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                        {listings.map((p) => (
-                            <ProductCard
-                                key={p.id}
-                                id={p.id}
-                                title={p.title}
-                                price={p.price / 100}
-                                location={p.city ?? undefined}
-                                variant="compact"
-                                imageUrl={p.imageUrl}
-                            />
-                        ))}
-                    </div>
-                )}
+                <SearchListingsGrid listings={listings} hasError={!!error} />
             </div>
         </div>
     );

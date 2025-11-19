@@ -1,5 +1,6 @@
 import { ProductCard } from "@/components/cards/product-card";
 import { PageTitle } from "@/components/misc/page-title";
+import { HomeListingsGrid } from "@/components/listing/home-listings-grid";
 import { supabase } from "@/lib/supabaseClient";
 
 type HomeProduct = {
@@ -8,6 +9,7 @@ type HomeProduct = {
     price: number;
     city: string | null;
     status: string;
+    sellerId: string;
     imageUrl?: string;
 };
 
@@ -17,20 +19,21 @@ export default async function HomePage() {
         .from("listings")
         .select(
             `
-      id,
-      title,
-      price,
-      city,
-      status,
-      listing_images (
-        image_url,
-        position
-      )
-    `
+              id,
+              title,
+              price,
+              city,
+              status,
+              seller_id,
+              listing_images (
+                image_url,
+                position
+              )
+            `
         )
         .eq("status", "active")
         .order("created_at", { ascending: false })
-        .limit(4) // on limite le nombre d'annonces
+        .limit(4)
         .order("position", { foreignTable: "listing_images", ascending: true }) // on trie les images par position
         .limit(1, { foreignTable: "listing_images" }); // ✅ on ne charge que la première image par annonce
 
@@ -46,6 +49,7 @@ export default async function HomePage() {
             price: row.price,
             city: row.city,
             status: row.status,
+            sellerId: row.seller_id,
             imageUrl: firstImage,
         };
     });
@@ -73,26 +77,7 @@ export default async function HomePage() {
                     </p>
                 )}
 
-                {products.length === 0 && !error ? (
-                    <p className="text-sm text-muted-foreground">
-                        Aucune annonce disponible pour le moment.
-                    </p>
-                ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-                        {products.map((p) => (
-                            <ProductCard
-                                key={p.id}
-                                id={p.id}
-                                title={p.title}
-                                // Prix en euros (stocké en centimes en base)
-                                price={p.price / 100}
-                                location={p.city ?? undefined}
-                                variant="compact"
-                                imageUrl={p.imageUrl}
-                            />
-                        ))}
-                    </div>
-                )}
+                <HomeListingsGrid products={products} hasError={!!error} />
             </section>
         </div>
     );
