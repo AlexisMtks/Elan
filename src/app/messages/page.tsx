@@ -29,6 +29,7 @@ interface Conversation {
     contactAvatarUrl: string | null;
     listingPrice: number | null;
     messagesSearchText: string;
+    lastMessageAt: string | null; // ✅ nouveau
 }
 
 interface Message {
@@ -288,7 +289,8 @@ export default function MessagesPage() {
                     productTitle: listingRow?.title ?? "Annonce supprimée",
                     listingId: conv.listing_id ?? listingRow?.id ?? null,
                     lastMessagePreview: conv.last_message_preview as string | null,
-                    updatedAt: formatConversationTimestamp(lastTimestamp),
+                    updatedAt: formatConversationTimestamp(conv.last_message_at),
+                    lastMessageAt: conv.last_message_at ?? null,            // ✅ ici
                     unreadCount: aggregate.count,
                     buyerId: conv.buyer_id,
                     sellerId: conv.seller_id,
@@ -412,6 +414,7 @@ export default function MessagesPage() {
                         ...c,
                         lastMessagePreview: newMessage.content,
                         updatedAt: formatConversationTimestamp(sentAt),
+                        lastMessageAt: sentAt.toISOString(), // ✅ pour le tri
                         messagesSearchText: `${c.messagesSearchText ?? ""} ${newMessage.content}`,
                         unreadCount: c.unreadCount + 1,
                     }
@@ -645,19 +648,27 @@ export default function MessagesPage() {
                             </>
                         )}
 
-                        {/* 🔁 Liste complète, toujours affichée dessous */}
+                        {/* 🔁 Liste complète, toujours affichée dessous, triée par dernier message */}
                         {!loadingConversations &&
-                            conversations.map((conversation) => (
-                                <ConversationItem
-                                    key={conversation.id}
-                                    conversation={conversation}
-                                    isActive={conversation.id === selectedConversationId}
-                                    onSelect={() => setSelectedConversationId(conversation.id)}
-                                    onDelete={() => handleRequestDeleteConversation(conversation)}
-                                    // pas de highlightTerm ici → liste normale
-                                />
-                            )
-                        )}
+                            [...conversations]
+                                .sort((a, b) => {
+                                    if (!a.lastMessageAt && !b.lastMessageAt) return 0;
+                                    if (!a.lastMessageAt) return 1;
+                                    if (!b.lastMessageAt) return -1;
+                                    return (
+                                        new Date(b.lastMessageAt).getTime() -
+                                        new Date(a.lastMessageAt).getTime()
+                                    );
+                                })
+                                .map((conversation) => (
+                                    <ConversationItem
+                                        key={conversation.id}
+                                        conversation={conversation}
+                                        isActive={conversation.id === selectedConversationId}
+                                        onSelect={() => setSelectedConversationId(conversation.id)}
+                                        onDelete={() => handleRequestDeleteConversation(conversation)}
+                                    />
+                                ))}
                     </div>
                 </Card>
 
