@@ -6,9 +6,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { supabase } from "@/lib/supabaseClient";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { AppModal } from "@/components/modals/app-modal";
 import Link from "next/link";
+import { supabase } from "@/lib/supabaseClient";
 
 type ConversationId = number;
 
@@ -42,10 +43,10 @@ function normalizeRelation<T = any>(rel: any): T | null {
 export default function MessagesPage() {
     const [conversationCreated, setConversationCreated] = useState(false);
     const { user, checking } = useRequireAuth();
+    const router = useRouter();
 
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [selectedConversationId, setSelectedConversationId] =
-        useState<ConversationId | null>(null);
+    const [selectedConversationId, setSelectedConversationId] = useState<ConversationId | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [messageInput, setMessageInput] = useState("");
     const [loadingConversations, setLoadingConversations] = useState(false);
@@ -53,6 +54,11 @@ export default function MessagesPage() {
 
     const [querySellerId, setQuerySellerId] = useState<string | null>(null);
     const [queryListingId, setQueryListingId] = useState<string | null>(null);
+
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [conversationToDelete, setConversationToDelete] =
+        useState<Conversation | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Lecture des query params côté client
     useEffect(() => {
@@ -191,8 +197,10 @@ export default function MessagesPage() {
                 const matched = formatted.find(
                     (conv) =>
                         conv.listingId === queryListingId &&
-                        ((conv.buyerId === user.id && conv.sellerId === querySellerId) ||
-                            (conv.sellerId === user.id && conv.buyerId === querySellerId)),
+                        ((conv.buyerId === user.id &&
+                                conv.sellerId === querySellerId) ||
+                            (conv.sellerId === user.id &&
+                                conv.buyerId === querySellerId)),
                 );
 
                 if (matched) {
@@ -300,6 +308,75 @@ export default function MessagesPage() {
         (c) => c.id === selectedConversationId,
     );
 
+    // Demande de suppression (ouvre le pop-up)
+    const handleRequestDeleteConversation = () => {
+        if (!selectedConversation) return;
+        setConversationToDelete(selectedConversation);
+        setDeleteModalOpen(true);
+    };
+
+    // Confirmation de suppression (appel Supabase)
+    const handleConfirmDeleteConversation = async () => {
+        if (!conversationToDelete || !user) return;
+
+        setIsDeleting(true);
+
+        const conversationId = conversationToDelete.id;
+
+        // 1) Supprimer les messages liés (si pas de cascade en DB)
+        const { error: messagesError } = await supabase
+            .from("messages")
+            .delete()
+            .eq("conversation_id", conversationId);
+
+        if (messagesError) {
+            console.error(
+                "Erreur suppression messages de la conversation :",
+                messagesError
+            );
+            // On ne touche pas au state React si la DB n'a pas été modifiée
+            setIsDeleting(false);
+            return;
+        }
+
+        // 2) Supprimer la conversation
+        const { error: convError } = await supabase
+            .from("conversations")
+            .delete()
+            .eq("id", conversationId);
+
+        if (convError) {
+            console.error("Erreur suppression conversation :", convError);
+            // Idem, on ne met pas à jour le state
+            setIsDeleting(false);
+            return;
+        }
+
+        // 3) Ici, on est sûr que la suppression en base est OK → on met l'UI à jour
+
+        // vider le fil
+        setMessages([]);
+
+        // mettre à jour la liste + sélectionner une autre conversation si dispo
+        setConversations((prev) => {
+            const updated = prev.filter((c) => c.id !== conversationId);
+            setSelectedConversationId(updated.length > 0 ? updated[0].id : null);
+            return updated;
+        });
+
+        // nettoyer les query params dans le state
+        setQuerySellerId(null);
+        setQueryListingId(null);
+
+        // nettoyer l’URL
+        router.replace("/messages");
+
+        // fermer la modal et reset
+        setIsDeleting(false);
+        setDeleteModalOpen(false);
+        setConversationToDelete(null);
+    };
+
     // ÉTATS D’AUTH
     if (checking) {
         return (
@@ -324,98 +401,155 @@ export default function MessagesPage() {
 
     // Ici, on est sûr d’avoir un user authentifié
     return (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.6fr)]">
-            {/* Liste des conversations */}
-            <Card className="flex flex-col rounded-2xl border p-4">
-                <div className="space-y-3">
-                    <p className="text-sm font-semibold">Conversations</p>
-                    <Input
-                        placeholder="Rechercher une conversation"
-                        className="h-9 text-sm"
-                    />
-                </div>
-
-                <div className="mt-4 flex flex-1 flex-col gap-2 overflow-y-auto">
-                    {loadingConversations && (
-                        <p className="mt-6 text-center text-xs text-muted-foreground">
-                            Chargement de vos conversations…
-                        </p>
-                    )}
-
-                    {!loadingConversations && conversations.length === 0 && (
-                        <p className="mt-6 text-center text-xs text-muted-foreground">
-                            Aucune conversation pour le moment.
-                        </p>
-                    )}
-
-                    {conversations.map((conversation) => (
-                        <ConversationItem
-                            key={conversation.id}
-                            conversation={conversation}
-                            isActive={conversation.id === selectedConversationId}
-                            onSelect={() => setSelectedConversationId(conversation.id)}
+        <>
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.6fr)]">
+                {/* Liste des conversations */}
+                <Card className="flex flex-col rounded-2xl border p-4">
+                    <div className="space-y-3">
+                        <p className="text-sm font-semibold">Conversations</p>
+                        <Input
+                            placeholder="Rechercher une conversation"
+                            className="h-9 text-sm"
                         />
-                    ))}
-                </div>
-            </Card>
-
-            {/* Fil de messages */}
-            <Card className="flex flex-col rounded-2xl border p-4">
-                {selectedConversation ? (
-                    <>
-                        <ThreadHeader conversation={selectedConversation} />
-
-                        <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-2xl bg-muted/40 p-3 text-sm">
-                            {loadingMessages && (
-                                <p className="text-center text-xs text-muted-foreground">
-                                    Chargement des messages…
-                                </p>
-                            )}
-
-                            {!loadingMessages &&
-                                messages.map((message) => (
-                                    <MessageBubble key={message.id} message={message} />
-                                ))}
-
-                            {!loadingMessages && messages.length === 0 && (
-                                <p className="text-center text-xs text-muted-foreground">
-                                    Aucun message pour le moment.
-                                </p>
-                            )}
-                        </div>
-
-                        <form
-                            onSubmit={handleSendMessage}
-                            className="mt-4 flex items-end gap-3"
-                        >
-                            <div className="flex-1 space-y-1">
-                                <label
-                                    htmlFor="message"
-                                    className="text-xs text-muted-foreground"
-                                >
-                                    Votre message
-                                </label>
-                                <textarea
-                                    id="message"
-                                    rows={3}
-                                    className="w-full resize-none rounded-xl border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                    placeholder="Écrivez votre message..."
-                                    value={messageInput}
-                                    onChange={(e) => setMessageInput(e.target.value)}
-                                />
-                            </div>
-                            <Button type="submit" className="self-stretch">
-                                Envoyer
-                            </Button>
-                        </form>
-                    </>
-                ) : (
-                    <div className="flex h-full flex-1 flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                        <p>Sélectionnez une conversation dans la colonne de gauche.</p>
                     </div>
-                )}
-            </Card>
-        </div>
+
+                    <div className="mt-4 flex flex-1 flex-col gap-2 overflow-y-auto">
+                        {loadingConversations && (
+                            <p className="mt-6 text-center text-xs text-muted-foreground">
+                                Chargement de vos conversations…
+                            </p>
+                        )}
+
+                        {!loadingConversations && conversations.length === 0 && (
+                            <p className="mt-6 text-center text-xs text-muted-foreground">
+                                Aucune conversation pour le moment.
+                            </p>
+                        )}
+
+                        {conversations.map((conversation) => (
+                            <ConversationItem
+                                key={conversation.id}
+                                conversation={conversation}
+                                isActive={conversation.id === selectedConversationId}
+                                onSelect={() =>
+                                    setSelectedConversationId(conversation.id)
+                                }
+                            />
+                        ))}
+                    </div>
+                </Card>
+
+                {/* Fil de messages */}
+                <Card className="flex flex-col rounded-2xl border p-4">
+                    {selectedConversation ? (
+                        <>
+                            <ThreadHeader
+                                conversation={selectedConversation}
+                                onDelete={handleRequestDeleteConversation}
+                            />
+
+                            <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-2xl bg-muted/40 p-3 text-sm">
+                                {loadingMessages && (
+                                    <p className="text-center text-xs text-muted-foreground">
+                                        Chargement des messages…
+                                    </p>
+                                )}
+
+                                {!loadingMessages &&
+                                    messages.map((message) => (
+                                        <MessageBubble
+                                            key={message.id}
+                                            message={message}
+                                        />
+                                    ))}
+
+                                {!loadingMessages && messages.length === 0 && (
+                                    <p className="text-center text-xs text-muted-foreground">
+                                        Aucun message pour le moment.
+                                    </p>
+                                )}
+                            </div>
+
+                            <form
+                                onSubmit={handleSendMessage}
+                                className="mt-4 flex items-end gap-3"
+                            >
+                                <div className="flex-1 space-y-1">
+                                    <label
+                                        htmlFor="message"
+                                        className="text-xs text-muted-foreground"
+                                    >
+                                        Votre message
+                                    </label>
+                                    <textarea
+                                        id="message"
+                                        rows={3}
+                                        className="w-full resize-none rounded-xl border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                        placeholder="Écrivez votre message..."
+                                        value={messageInput}
+                                        onChange={(e) =>
+                                            setMessageInput(e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <Button type="submit" className="self-stretch">
+                                    Envoyer
+                                </Button>
+                            </form>
+                        </>
+                    ) : (
+                        <div className="flex h-full flex-1 flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                            <p>Sélectionnez une conversation dans la colonne de gauche.</p>
+                        </div>
+                    )}
+                </Card>
+            </div>
+
+            {/* Pop-up de suppression de conversation */}
+            <AppModal
+                open={deleteModalOpen}
+                onOpenChange={(open) => {
+                    setDeleteModalOpen(open);
+                    if (!open) {
+                        setConversationToDelete(null);
+                        setIsDeleting(false);
+                    }
+                }}
+                title="Supprimer la conversation"
+                description="Cette action est définitive et ne peut pas être annulée."
+                footer={
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                setDeleteModalOpen(false);
+                                setConversationToDelete(null);
+                            }}
+                            disabled={isDeleting}
+                        >
+                            Annuler
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleConfirmDeleteConversation}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? "Suppression..." : "Supprimer"}
+                        </Button>
+                    </div>
+                }
+            >
+                <p className="text-sm text-muted-foreground">
+                    Êtes-vous sûr de vouloir supprimer la conversation
+                    {conversationToDelete
+                        ? ` avec « ${conversationToDelete.contactName} »`
+                        : ""}{" "}
+                    ?
+                </p>
+            </AppModal>
+        </>
     );
 }
 
@@ -480,9 +614,10 @@ function ConversationItem({
 
 interface ThreadHeaderProps {
     conversation: Conversation;
+    onDelete: () => void;
 }
 
-function ThreadHeader({ conversation }: ThreadHeaderProps) {
+function ThreadHeader({ conversation, onDelete }: ThreadHeaderProps) {
     const router = useRouter();
 
     const initials =
@@ -512,14 +647,25 @@ function ThreadHeader({ conversation }: ThreadHeaderProps) {
                 </div>
             </div>
 
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleViewListing}
-            >
-                Voir l’annonce
-            </Button>
+            <div className="flex items-center gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleViewListing}
+                >
+                    Voir l’annonce
+                </Button>
+
+                <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={onDelete}
+                >
+                    Supprimer
+                </Button>
+            </div>
         </div>
     );
 }
