@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AppIcon } from "@/components/misc/app-icon";
 
 type Gender = "female" | "male" | "other" | "unspecified";
 
@@ -135,26 +136,52 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
           </div>
 
           {/* Avatar cliquable avec hover sombre */}
-          <div className="flex flex-col items-center gap-2 md:items-end">
-            <button
-                type="button"
-                onClick={handleClickAvatar}
-                className="group relative h-16 w-16 rounded-full"
-                aria-label="Modifier la photo de profil"
-            >
-              <Avatar className="h-16 w-16">
-                <AvatarImage src={safeAvatarUrl} alt={displayLabel} />
-                <AvatarFallback>{initials}</AvatarFallback>
-              </Avatar>
+          <div className="flex flex-col items-center gap-2 md:items-end relative">
+            {/* Wrapper taille fixe pour avatar + icône */}
+            <div className="relative h-16 w-16">
+              {/* Avatar cliquable */}
+              <button
+                  type="button"
+                  onClick={handleClickAvatar}
+                  className="group h-16 w-16 rounded-full"
+                  aria-label="Modifier la photo de profil"
+              >
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={safeAvatarUrl} alt={displayLabel}/>
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
 
-              <div className="pointer-events-none absolute inset-0 rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100" />
+                <div className="pointer-events-none absolute inset-0 rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100"/>
 
-              {isSubmitting  && (
-                  <span className="absolute inset-0 flex items-center justify-center rounded-full text-xs text-white">
-        …
-      </span>
-              )}
-            </button>
+                {isSubmitting && (
+                    <span className="absolute inset-0 flex items-center justify-center rounded-full text-xs text-white"></span>
+                )}
+              </button>
+
+              {/* Bouton supprimer avatar */}
+              <button
+                  type="button"
+                  onClick={() => console.log("TODO: supprimer avatar")}
+                  className="
+                        absolute
+                        bottom-0
+                        right-0
+                        h-7
+                        w-7
+                        rounded-full
+                        bg-background
+                        shadow
+                        flex
+                        items-center
+                        justify-center
+                        border
+                        border-border
+                      "
+                  aria-label="Supprimer la photo de profil"
+              >
+                <AppIcon name="trash" size={16}/>
+              </button>
+            </div>
 
             {/* Input fichier caché */}
             <input
@@ -164,10 +191,7 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0] ?? null;
-
-                  if (onAvatarFileSelected) {
-                    onAvatarFileSelected(file);
-                  }
+                  if (onAvatarFileSelected) onAvatarFileSelected(file);
                 }}
             />
           </div>
@@ -189,7 +213,7 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
           {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
-            <Input id="email" name="email" type="email" defaultValue={email} />
+            <Input id="email" name="email" type="email" defaultValue={email}/>
           </div>
 
           {/* Prénom */}
