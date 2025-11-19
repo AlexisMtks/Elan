@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -33,10 +33,6 @@ interface Message {
 export default function MessagesPage() {
   const { user, checking } = useRequireAuth();
 
-  const searchParams = useSearchParams();
-  const sellerIdFromQuery = searchParams.get("seller");
-  const listingIdFromQuery = searchParams.get("listing");
-
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<ConversationId | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -44,17 +40,32 @@ export default function MessagesPage() {
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
+  const [querySellerId, setQuerySellerId] = useState<string | null>(null);
+  const [queryListingId, setQueryListingId] = useState<string | null>(null);
+
+  // Lecture des query params côté client
+  useEffect(() => {
+      if (typeof window === "undefined") return;
+
+      const url = new URL(window.location.href);
+      const seller = url.searchParams.get("seller");
+      const listing = url.searchParams.get("listing");
+
+      setQuerySellerId(seller);
+      setQueryListingId(listing);
+  }, []);
+
   // 🔹 Charger les conversations pour l’utilisateur connecté
   useEffect(() => {
-    if (!user) return;
+        if (!user) return;
 
-    const fetchConversations = async () => {
-      setLoadingConversations(true);
+        const fetchConversations = async () => {
+            setLoadingConversations(true);
 
-      const { data, error } = await supabase
-          .from("conversations")
-          .select(
-              `
+            const { data, error } = await supabase
+                .from("conversations")
+                .select(
+                    `
           id,
           buyer_id,
           seller_id,
@@ -66,75 +77,76 @@ export default function MessagesPage() {
           seller:profiles!conversations_seller_id_fkey ( id, display_name ),
           messages:messages(count)
         `
-          )
-          .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-          .order("last_message_at", { ascending: false });
+                )
+                .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+                .order("last_message_at", { ascending: false });
 
-      if (error) {
-        console.error("Erreur chargement conversations :", error);
-        setLoadingConversations(false);
-        return;
-      }
+            if (error) {
+                console.error("Erreur chargement conversations :", error);
+                setLoadingConversations(false);
+                return;
+            }
 
-      const formatted: Conversation[] = (data ?? []).map((conv: any) => {
-        const sellerRow = conv.seller?.[0];
-        const buyerRow = conv.buyer?.[0];
-        const listingRow = conv.listing?.[0];
+            const formatted: Conversation[] = (data ?? []).map((conv: any) => {
+                const sellerRow = conv.seller?.[0];
+                const buyerRow = conv.buyer?.[0];
+                const listingRow = conv.listing?.[0];
 
-        const isSeller = conv.seller_id === user.id;
-        const contactProfile = isSeller ? buyerRow : sellerRow;
+                const isSeller = conv.seller_id === user.id;
+                const contactProfile = isSeller ? buyerRow : sellerRow;
 
-        const contactName =
-            contactProfile?.display_name ??
-            (isSeller ? "Acheteur inconnu" : "Vendeur inconnu");
+                const contactName =
+                    contactProfile?.display_name ??
+                    (isSeller ? "Acheteur inconnu" : "Vendeur inconnu");
 
-        return {
-          id: conv.id as number,
-          contactName,
-          contactProfileId: contactProfile?.id ?? null,      // ✅
-          productTitle: listingRow?.title ?? "Annonce supprimée",
-          listingId: conv.listing_id ?? listingRow?.id ?? null, // ✅
-          lastMessagePreview: conv.last_message_preview as string | null,
-          updatedAt: conv.last_message_at
-              ? new Date(conv.last_message_at).toLocaleString("fr-FR", {
-                dateStyle: "short",
-                timeStyle: "short",
-              })
-              : "Date inconnue",
-          unreadCount: conv.messages?.[0]?.count ?? 0,
+                return {
+                    id: conv.id as number,
+                    contactName,
+                    contactProfileId: contactProfile?.id ?? null,
+                    productTitle: listingRow?.title ?? "Annonce supprimée",
+                    listingId: conv.listing_id ?? listingRow?.id ?? null,
+                    lastMessagePreview: conv.last_message_preview as string | null,
+                    updatedAt: conv.last_message_at
+                        ? new Date(conv.last_message_at).toLocaleString("fr-FR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                        })
+                        : "Date inconnue",
+                    unreadCount: conv.messages?.[0]?.count ?? 0,
+                };
+            });
+
+            setConversations(formatted);
+
+            // ✅ si on vient d’une annonce (query params présents)
+            let initialConversationId: ConversationId | null = null;
+
+            if (querySellerId && queryListingId) {
+                const matched = formatted.find(
+                    (conv) =>
+                        conv.listingId === queryListingId &&
+                        conv.contactProfileId === querySellerId
+                );
+
+                if (matched) {
+                    initialConversationId = matched.id;
+                }
+            }
+
+            // fallback: première conversation
+            if (!initialConversationId && formatted.length > 0) {
+                initialConversationId = formatted[0].id;
+            }
+
+            if (initialConversationId) {
+                setSelectedConversationId(initialConversationId);
+            }
+
+            setLoadingConversations(false);
         };
-      });
 
-      setConversations(formatted);
-
-      // ✅ Si on vient d'une annonce, essayer de trouver la bonne conversation
-      let initialConversationId: ConversationId | null = null;
-
-      if (sellerIdFromQuery && listingIdFromQuery) {
-        const matched = formatted.find(
-            (conv) =>
-                conv.listingId === listingIdFromQuery &&
-                conv.contactProfileId === sellerIdFromQuery
-        );
-        if (matched) {
-          initialConversationId = matched.id;
-        }
-      }
-
-      // Sinon, fallback sur la première conversation
-      if (!initialConversationId && formatted.length > 0) {
-        initialConversationId = formatted[0].id;
-      }
-
-      if (initialConversationId) {
-        setSelectedConversationId(initialConversationId);
-      }
-
-      setLoadingConversations(false);
-    };
-
-    fetchConversations();
-  }, [user, sellerIdFromQuery, listingIdFromQuery]);
+        fetchConversations();
+    }, [user, querySellerId, queryListingId]);
 
   // 🔹 Charger les messages de la conversation sélectionnée
   useEffect(() => {
