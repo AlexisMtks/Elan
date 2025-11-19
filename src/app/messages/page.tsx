@@ -555,8 +555,6 @@ export default function MessagesPage() {
     );
 }
 
-/* --- Sous-composants inchangés --- */
-
 interface ConversationItemProps {
     conversation: Conversation;
     isActive: boolean;
@@ -578,14 +576,23 @@ function ConversationItem({
             .toUpperCase() || "EL";
 
     const handleDeleteClick = (event: MouseEvent<HTMLButtonElement>) => {
-        event.stopPropagation(); // ✅ n’ouvre pas la conversation
+        event.stopPropagation(); // ✅ n’active pas le onSelect
         onDelete();
     };
 
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect();
+        }
+    };
+
     return (
-        <button
-            type="button"
+        <div
+            role="button"
+            tabIndex={0}
             onClick={onSelect}
+            onKeyDown={handleKeyDown}
             className={[
                 "flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-xs transition",
                 isActive
@@ -630,9 +637,10 @@ function ConversationItem({
                     <AppIcon name="trash" size={14} />
                 </button>
             </div>
-        </button>
+        </div>
     );
 }
+
 
 interface ThreadHeaderProps {
     conversation: Conversation;
