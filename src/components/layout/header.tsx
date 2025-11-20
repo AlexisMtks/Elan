@@ -219,34 +219,17 @@ export function Header({ variant = "default" }: HeaderProps) {
 
           {/* Barre de recherche */}
           {showSearch && (
-              <>
-                {/* Desktop : champ de recherche complet */}
-                <form
-                    className="hidden flex-1 md:block"
-                    onSubmit={handleSearchSubmit}
-                >
-                  <Input
-                      placeholder="Rechercher…"
-                      className="rounded-full translate-y-[1px]"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                  />
-                </form>
-
-                {/* Mobile : bouton pill qui renvoie vers la page de recherche */}
-                <Link
-                    href="/research"
-                    className="flex-1 md:hidden"
-                    aria-label="Rechercher un article"
-                >
-                  <Button
-                      variant="outline"
-                      className="w-full justify-start rounded-full px-4 text-sm font-medium"
-                  >
-                    Recherche
-                  </Button>
-                </Link>
-              </>
+              <form
+                  className="flex-1"
+                  onSubmit={handleSearchSubmit}
+              >
+                <Input
+                    placeholder="Rechercher…"
+                    className="h-9 rounded-full translate-y-[1px] text-sm md:h-10"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+              </form>
           )}
 
           <div className="flex items-center gap-2 sm:gap-3">
