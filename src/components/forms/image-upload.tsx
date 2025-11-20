@@ -1,7 +1,6 @@
 "use client";
 
-import { ChangeEvent, useCallback, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 
 interface ImageUploadProps {
     value?: string[];
@@ -13,6 +12,7 @@ interface ImageUploadProps {
  * Composant d’upload d’images pour les annonces.
  * - Supporte le clic + sélection de fichiers
  * - Supporte le drag & drop (glisser-déposer) dans la zone principale
+ * - Supporte le drag & drop global (sur toute la fenêtre)
  * - Upload vers /api/listings/images (un fichier après l’autre)
  */
 export function ImageUpload({
@@ -30,6 +30,7 @@ export function ImageUpload({
     const canAddMore = imageUrls.length < maxImages;
 
     const triggerFilePicker = () => {
+        if (!canAddMore) return;
         fileInputRef.current?.click();
     };
 
@@ -83,6 +84,7 @@ export function ImageUpload({
                 console.error("Erreur inattendue lors de l’upload d’images :", err);
             } finally {
                 setUploading(false);
+                setIsDragging(false);
             }
         },
         [canAddMore, imageUrls, maxImages, onChange, value],
@@ -97,7 +99,7 @@ export function ImageUpload({
         void handleFiles(files);
     };
 
-    // --- Drag & drop handlers ---
+    // --- Drag & drop handlers sur la zone ---
 
     const handleDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
         event.preventDefault();
@@ -129,6 +131,52 @@ export function ImageUpload({
         void handleFiles(droppedFiles);
     };
 
+    // --- Drag & drop global sur toute la fenêtre ---
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (!canAddMore) return;
+
+        let dragCounter = 0;
+
+        const handleWindowDragOver = (event: DragEvent) => {
+            event.preventDefault();
+            if (!event.dataTransfer) return;
+            if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+
+            dragCounter++;
+            setIsDragging(true);
+        };
+
+        const handleWindowDragLeave = (event: DragEvent) => {
+            event.preventDefault();
+            dragCounter = Math.max(0, dragCounter - 1);
+            if (dragCounter === 0) {
+                setIsDragging(false);
+            }
+        };
+
+        const handleWindowDrop = (event: DragEvent) => {
+            event.preventDefault();
+            const files = Array.from(event.dataTransfer?.files ?? []);
+            dragCounter = 0;
+            setIsDragging(false);
+
+            if (!files.length) return;
+            void handleFiles(files);
+        };
+
+        window.addEventListener("dragover", handleWindowDragOver);
+        window.addEventListener("dragleave", handleWindowDragLeave);
+        window.addEventListener("drop", handleWindowDrop);
+
+        return () => {
+            window.removeEventListener("dragover", handleWindowDragOver);
+            window.removeEventListener("dragleave", handleWindowDragLeave);
+            window.removeEventListener("drop", handleWindowDrop);
+        };
+    }, [canAddMore, handleFiles]);
+
     const handleRemove = (urlToRemove: string) => {
         const updated = imageUrls.filter((url) => url !== urlToRemove);
 
@@ -145,12 +193,12 @@ export function ImageUpload({
             {/* Zone drop principale */}
             <div
                 className={[
-                    "flex flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/40 px-4 py-5 text-center transition-colors",
+                    "flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-muted/40 px-6 py-8 text-center transition-colors",
                     canAddMore ? "cursor-pointer" : "cursor-not-allowed opacity-70",
-                    isDragging ? "border-primary/60 bg-muted/70" : "border-border",
+                    isDragging ? "border-primary bg-muted/70" : "border-border/70",
                     uploading ? "opacity-80" : "",
                 ].join(" ")}
-                onClick={canAddMore ? triggerFilePicker : undefined}
+                onClick={triggerFilePicker}
                 onDragOver={handleDragOver}
                 onDragEnter={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -200,17 +248,8 @@ export function ImageUpload({
                 </div>
             )}
 
-            {/* Bouton secondaire + input file caché */}
-            <div className="flex items-center justify-between">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!canAddMore}
-                    onClick={triggerFilePicker}
-                >
-                    Ajouter des images
-                </Button>
+            {/* Compteur d'images */}
+            <div className="flex items-center justify-end">
                 <p className="text-xs text-muted-foreground">
                     {imageUrls.length} / {maxImages} photos
                 </p>
