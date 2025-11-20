@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -17,27 +17,69 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { AvatarCropperDialog } from "@/components/avatar/avatar-cropper-dialog";
 
 export function RegisterForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [gender, setGender] = useState<string | undefined>(undefined);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  // 🔹 États pour le recadrage d’avatar
+  const [rawAvatarFile, setRawAvatarFile] = useState<File | null>(null);
+  const [croppedAvatarBlob, setCroppedAvatarBlob] = useState<Blob | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarCropperOpen, setAvatarCropperOpen] = useState(false);
+
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Nettoyage de l’URL de prévisualisation à l’unmount
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [avatarPreviewUrl]);
 
   const handleClickAvatar = () => {
     fileInputRef.current?.click();
   };
 
-  const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleNewAvatarFile = (file: File | null) => {
+    if (!file) {
+      setRawAvatarFile(null);
+      setCroppedAvatarBlob(null);
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+        setAvatarPreviewUrl(null);
+      }
+      return;
+    }
 
-    setAvatarFile(file);
-    const previewUrl = URL.createObjectURL(file);
-    setAvatarPreview(previewUrl);
+    setRawAvatarFile(file);
+    setAvatarCropperOpen(true);
+  };
+
+  const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    handleNewAvatarFile(file);
+  };
+
+  // Quand le recadrage est validé dans le modal
+  const handleAvatarCropped = (blob: Blob) => {
+    setCroppedAvatarBlob(blob);
+
+    // Met à jour l’aperçu local
+    const url = URL.createObjectURL(blob);
+    setAvatarPreviewUrl((prev) => {
+      if (prev) {
+        URL.revokeObjectURL(prev);
+      }
+      return url;
+    });
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -67,7 +109,8 @@ export function RegisterForm() {
     const address_line1 = ((formData.get("address") as string) || "").trim();
     const postcode = ((formData.get("postcode") as string) || "").trim();
     const bio = ((formData.get("bio") as string) || "").trim() || null;
-    const phone_number = ((formData.get("phone_number") as string) || "").trim() || null;
+    const phone_number =
+        ((formData.get("phone_number") as string) || "").trim() || null;
 
     const display_name =
         username ||
@@ -111,11 +154,16 @@ export function RegisterForm() {
       return;
     }
 
-    // Upload avatar si un fichier a été sélectionné
-    if (avatarFile) {
+    // 2️⃣ Upload avatar recadré si présent
+    // On transforme le Blob recadré en File
+    const avatarFileToUpload = croppedAvatarBlob
+        ? new File([croppedAvatarBlob], "avatar.jpg", { type: "image/jpeg" })
+        : null;
+
+    if (avatarFileToUpload) {
       try {
         const fd = new FormData();
-        fd.append("file", avatarFile);
+        fd.append("file", avatarFileToUpload);
         fd.append("userId", user.id);
 
         const resAvatar = await fetch("/api/account/avatar", {
@@ -125,7 +173,7 @@ export function RegisterForm() {
 
         if (resAvatar.ok) {
           const avatarData = (await resAvatar.json()) as { publicUrl: string };
-          avatarUrl = avatarData.publicUrl; // Utilisable plus tard si tu veux
+          avatarUrl = avatarData.publicUrl;
         } else {
           console.error("Erreur API avatar pendant l'inscription");
         }
@@ -134,7 +182,7 @@ export function RegisterForm() {
       }
     }
 
-    // 2️⃣ Si confirmation email requise (pas de session ouverte)
+    // 3️⃣ Si confirmation email requise (pas de session ouverte)
     if (!session) {
       alert("Compte créé ! Vérifiez vos e-mails pour confirmer votre adresse.");
       setLoading(false);
@@ -142,8 +190,7 @@ export function RegisterForm() {
       return;
     }
 
-    // 3️⃣ Création / mise à jour du profil
-    // (On ne met PAS avatar_url ici pour ne pas écraser ce que met l'API)
+    // 4️⃣ Création / mise à jour du profil
     const { error: profileError } = await supabase.from("profiles").upsert(
         {
           id: user.id,
@@ -158,6 +205,7 @@ export function RegisterForm() {
           phone_number,
           profile_visibility: "public",
           profile_type: "public",
+          // On ne met pas avatar_url ici, il est géré côté API / triggers si besoin
         },
         { onConflict: "id" },
     );
@@ -169,7 +217,7 @@ export function RegisterForm() {
       return;
     }
 
-    // 4️⃣ Insertion adresse (liée au profil)
+    // 5️⃣ Insertion adresse (liée au profil)
     const { error: addressError } = await supabase.from("addresses").insert({
       user_id: user.id,
       line1: address_line1,
@@ -188,217 +236,262 @@ export function RegisterForm() {
     router.push("/account");
   };
 
-  return (
-      <Card className="mx-auto max-w-2xl rounded-2xl border p-6">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Section : Informations personnelles */}
-          <section className="space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold">Informations personnelles</h2>
-              <p className="text-sm text-muted-foreground">
-                Ces informations apparaîtront sur votre profil public.
-              </p>
-            </div>
+  const handleAvatarDragOver = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(true);
+  };
 
-            {/* Avatar */}
-            <div className="flex items-center gap-4">
+  const handleAvatarDragLeave = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleAvatarDrop = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+
+    handleNewAvatarFile(file);
+  };
+
+  return (
+      <>
+        <Card className="mx-auto max-w-2xl rounded-2xl border p-6">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Section : Informations personnelles */}
+            <section className="space-y-4">
               <div className="space-y-1">
-                <Label>Photo de profil</Label>
-                <p className="text-xs text-muted-foreground">
-                  Optionnel, vous pourrez la modifier plus tard dans votre compte.
+                <h2 className="text-lg font-semibold">Informations personnelles</h2>
+                <p className="text-sm text-muted-foreground">
+                  Ces informations apparaîtront sur votre profil public.
                 </p>
               </div>
-              <button
-                  type="button"
-                  onClick={handleClickAvatar}
-                  className="relative rounded-full border bg-muted/50 p-1"
-              >
-                <Avatar className="h-16 w-16">
-                  {avatarPreview ? (
-                      <AvatarImage src={avatarPreview} alt="Aperçu avatar" />
-                  ) : (
-                      <AvatarFallback>É</AvatarFallback>
-                  )}
-                </Avatar>
-              </button>
-              <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarFileChange}
-              />
-            </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Username */}
-              <div className="space-y-2">
-                <Label htmlFor="username">
-                  Nom d’utilisateur <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                    id="username"
-                    name="username"
-                    placeholder="ex. marie_lem"
-                    required
+              {/* Avatar */}
+              <div className="flex items-center gap-4">
+                <div className="space-y-1">
+                  <Label>Photo de profil</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Optionnel, vous pourrez la modifier plus tard dans votre compte.
+                    Vous pouvez aussi glisser-déposer une image directement sur l’avatar.
+                  </p>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={handleClickAvatar}
+                    onDragOver={handleAvatarDragOver}
+                    onDragLeave={handleAvatarDragLeave}
+                    onDrop={handleAvatarDrop}
+                    className={`relative rounded-full border bg-muted/50 p-1 transition ${
+                        isDragOver ? "ring-2 ring-primary/60 border-primary/60" : ""
+                    }`}
+                >
+                  <Avatar className="h-16 w-16">
+                    {avatarPreviewUrl ? (
+                        <AvatarImage src={avatarPreviewUrl} alt="Aperçu avatar"/>
+                    ) : (
+                        <AvatarFallback>É</AvatarFallback>
+                    )}
+                  </Avatar>
+                </button>
+
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarFileChange}
                 />
               </div>
 
-              {/* Prénom */}
-              <div className="space-y-2">
-                <Label htmlFor="first_name">
-                  Prénom <span className="text-red-500">*</span>
-                </Label>
-                <Input id="first_name" name="first_name" required />
-              </div>
-
-              {/* Nom */}
-              <div className="space-y-2">
-                <Label htmlFor="last_name">
-                  Nom <span className="text-red-500">*</span>
-                </Label>
-                <Input id="last_name" name="last_name" required />
-              </div>
-
-              {/* Genre */}
-              <div className="space-y-2">
-                <Label htmlFor="gender">Genre</Label>
-                <Select onValueChange={(v) => setGender(v)}>
-                  <SelectTrigger id="gender" className="h-10">
-                    <SelectValue placeholder="Sélectionner un genre (optionnel)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="female">Femme</SelectItem>
-                    <SelectItem value="male">Homme</SelectItem>
-                    <SelectItem value="other">Autre</SelectItem>
-                    <SelectItem value="unspecified">Préfère ne pas dire</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Ville */}
-              <div className="space-y-2">
-                <Label htmlFor="city">Ville</Label>
-                <Input id="city" name="city" placeholder="ex. Lyon" />
-              </div>
-
-              {/* Pays */}
-              <div className="space-y-2">
-                <Label htmlFor="country">Pays</Label>
-                <Input id="country" name="country" placeholder="ex. France" />
-              </div>
-
-              {/* Code postal */}
-              <div className="space-y-2">
-                <Label htmlFor="postcode">Code postal</Label>
-                <Input id="postcode" name="postcode" placeholder="ex. 69001" />
-              </div>
-
-              {/* Adresse */}
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="address">Adresse</Label>
-                <Input
-                    id="address"
-                    name="address"
-                    placeholder="ex. 12 rue des Gymnastes"
-                />
-              </div>
-
-              {/* Bio */}
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="bio">Présentation</Label>
-                <Textarea
-                    id="bio"
-                    name="bio"
-                    placeholder="Décrivez brièvement votre profil ou votre activité..."
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Section contact */}
-          <section className="space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold">Connexion & contact</h2>
-              <p className="text-sm text-muted-foreground">
-                Ces informations seront utilisées pour sécuriser votre compte et
-                vous contacter si besoin.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email">
-                  Adresse e-mail <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="vous@example.com"
-                    required
-                />
-              </div>
-
-              {/* Téléphone */}
-              <div className="space-y-2">
-                <Label htmlFor="phone_number">Téléphone (optionnel)</Label>
-                <Input
-                    id="phone_number"
-                    name="phone_number"
-                    type="tel"
-                    placeholder="ex. 06 12 34 56 78"
-                />
-              </div>
-
-              {/* Mot de passe */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* Username */}
                 <div className="space-y-2">
-                  <Label htmlFor="password">
-                    Mot de passe <span className="text-red-500">*</span>
+                  <Label htmlFor="username">
+                    Nom d’utilisateur <span className="text-red-500">*</span>
                   </Label>
                   <Input
-                      id="password"
-                      name="password"
-                      type="password"
+                      id="username"
+                      name="username"
+                      placeholder="ex. marie_lem"
                       required
-                      minLength={6}
                   />
                 </div>
 
+                {/* Prénom */}
                 <div className="space-y-2">
-                  <Label htmlFor="password_confirm">
-                    Confirmation du mot de passe{" "}
-                    <span className="text-red-500">*</span>
+                  <Label htmlFor="first_name">
+                    Prénom <span className="text-red-500">*</span>
                   </Label>
+                  <Input id="first_name" name="first_name" required/>
+                </div>
+
+                {/* Nom */}
+                <div className="space-y-2">
+                  <Label htmlFor="last_name">
+                    Nom <span className="text-red-500">*</span>
+                  </Label>
+                  <Input id="last_name" name="last_name" required/>
+                </div>
+
+                {/* Genre */}
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Genre</Label>
+                  <Select onValueChange={(v) => setGender(v)}>
+                    <SelectTrigger id="gender" className="h-10">
+                      <SelectValue placeholder="Sélectionner un genre (optionnel)"/>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="female">Femme</SelectItem>
+                      <SelectItem value="male">Homme</SelectItem>
+                      <SelectItem value="other">Autre</SelectItem>
+                      <SelectItem value="unspecified">
+                        Préfère ne pas dire
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Ville */}
+                <div className="space-y-2">
+                  <Label htmlFor="city">Ville</Label>
+                  <Input id="city" name="city" placeholder="ex. Lyon"/>
+                </div>
+
+                {/* Pays */}
+                <div className="space-y-2">
+                  <Label htmlFor="country">Pays</Label>
+                  <Input id="country" name="country" placeholder="ex. France"/>
+                </div>
+
+                {/* Code postal */}
+                <div className="space-y-2">
+                  <Label htmlFor="postcode">Code postal</Label>
+                  <Input id="postcode" name="postcode" placeholder="ex. 69001"/>
+                </div>
+
+                {/* Adresse */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="address">Adresse</Label>
                   <Input
-                      id="password_confirm"
-                      name="password_confirm"
-                      type="password"
-                      required
-                      minLength={6}
+                      id="address"
+                      name="address"
+                      placeholder="ex. 12 rue des Gymnastes"
+                  />
+                </div>
+
+                {/* Bio */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="bio">Présentation</Label>
+                  <Textarea
+                      id="bio"
+                      name="bio"
+                      placeholder="Décrivez brièvement votre profil ou votre activité..."
                   />
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          {errorMsg && <p className="text-center text-sm text-red-500">{errorMsg}</p>}
+            {/* Section contact */}
+            <section className="space-y-4">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold">Connexion & contact</h2>
+                <p className="text-sm text-muted-foreground">
+                  Ces informations seront utilisées pour sécuriser votre compte et
+                  vous contacter si besoin.
+                </p>
+              </div>
 
-          <div className="space-y-3">
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Création en cours..." : "Créer mon compte"}
-            </Button>
+              <div className="space-y-4">
+                {/* Email */}
+                <div className="space-y-2">
+                  <Label htmlFor="email">
+                    Adresse e-mail <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="vous@example.com"
+                      required
+                  />
+                </div>
 
-            <div className="text-center text-xs text-muted-foreground">
-              <span>Vous avez déjà un compte ? </span>
-              <Button variant="link" size="sm" className="px-1" asChild>
-                <Link href="/login">Se connecter</Link>
+                {/* Téléphone */}
+                <div className="space-y-2">
+                  <Label htmlFor="phone_number">Téléphone (optionnel)</Label>
+                  <Input
+                      id="phone_number"
+                      name="phone_number"
+                      type="tel"
+                      placeholder="ex. 06 12 34 56 78"
+                  />
+                </div>
+
+                {/* Mot de passe */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">
+                      Mot de passe <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        required
+                        minLength={6}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password_confirm">
+                      Confirmation du mot de passe{" "}
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                        id="password_confirm"
+                        name="password_confirm"
+                        type="password"
+                        required
+                        minLength={6}
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {errorMsg && (
+                <p className="text-center text-sm text-red-500">{errorMsg}</p>
+            )}
+
+            <div className="space-y-3">
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Création en cours..." : "Créer mon compte"}
               </Button>
+
+              <div className="text-center text-xs text-muted-foreground">
+                <span>Vous avez déjà un compte ? </span>
+                <Button variant="link" size="sm" className="px-1" asChild>
+                  <Link href="/login">Se connecter</Link>
+                </Button>
+              </div>
             </div>
-          </div>
-        </form>
-      </Card>
+          </form>
+        </Card>
+
+        {/* 🔹 Modal de recadrage d’avatar */}
+        <AvatarCropperDialog
+            open={avatarCropperOpen}
+            onOpenChange={setAvatarCropperOpen}
+            file={rawAvatarFile}
+            onCropped={handleAvatarCropped}
+        />
+      </>
   );
 }

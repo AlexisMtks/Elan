@@ -1,98 +1,132 @@
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
+import { ChangeEvent, useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ImagePlus } from "lucide-react";
 
 interface ImageUploadProps {
-    /**
-     * Liste contrôlée des URLs d'images (mode contrôlé).
-     * Si non fournie, le composant gère son propre état interne.
-     */
     value?: string[];
-
-    /**
-     * Callback optionnel pour remonter la liste des URLs uploadées
-     * (utilisé par SellForm pour lier les images à l'annonce)
-     */
     onChange?: (urls: string[]) => void;
-
-    /**
-     * Nombre max d’images autorisées
-     */
     maxImages?: number;
 }
 
+/**
+ * Composant d’upload d’images pour les annonces.
+ * - Supporte le clic + sélection de fichiers
+ * - Supporte le drag & drop (glisser-déposer) dans la zone principale
+ * - Upload vers /api/listings/images (un fichier après l’autre)
+ */
 export function ImageUpload({
                                 value,
                                 onChange,
                                 maxImages = 6,
                             }: ImageUploadProps) {
-    // État interne utilisé uniquement si `value` n'est pas fourni
-    const [internalUrls, setInternalUrls] = useState<string[]>([]);
-    const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    // Source de vérité : prop contrôlée ou état interne
-    const imageUrls = value ?? internalUrls;
+    const [internalUrls, setInternalUrls] = useState<string[]>([]);
+    const [uploading, setUploading] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
 
-    const handleClickAdd = () => {
+    const imageUrls = value ?? internalUrls;
+    const canAddMore = imageUrls.length < maxImages;
+
+    const triggerFilePicker = () => {
         fileInputRef.current?.click();
     };
 
-    const handleFilesSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    /**
+     * Fonction centrale qui prend une liste de fichiers (que ce soit via
+     * <input type="file"> ou via drag & drop) et applique la logique d’upload.
+     */
+    const handleFiles = useCallback(
+        async (files: File[]) => {
+            if (!files.length || !canAddMore) return;
+
+            const remainingSlots = maxImages - imageUrls.length;
+            const filesToUpload = files.slice(0, remainingSlots);
+            if (filesToUpload.length === 0) return;
+
+            setUploading(true);
+
+            const newUrls: string[] = [];
+
+            try {
+                for (const file of filesToUpload) {
+                    const fd = new FormData();
+                    fd.append("file", file);
+
+                    const res = await fetch("/api/listings/images", {
+                        method: "POST",
+                        body: fd,
+                    });
+
+                    const data = await res.json().catch(() => null);
+
+                    if (!res.ok || !data?.publicUrl) {
+                        console.error("Erreur upload image listing :", data);
+                        continue;
+                    }
+
+                    newUrls.push(data.publicUrl);
+                }
+
+                if (newUrls.length > 0) {
+                    const updated = [...imageUrls, ...newUrls];
+
+                    if (value !== undefined) {
+                        onChange?.(updated); // mode contrôlé
+                    } else {
+                        setInternalUrls(updated); // mode non contrôlé
+                        onChange?.(updated);
+                    }
+                }
+            } catch (err) {
+                console.error("Erreur inattendue lors de l’upload d’images :", err);
+            } finally {
+                setUploading(false);
+            }
+        },
+        [canAddMore, imageUrls, maxImages, onChange, value],
+    );
+
+    const handleFilesSelected = async (
+        event: ChangeEvent<HTMLInputElement>,
+    ) => {
         const files = Array.from(event.target.files ?? []);
-        if (files.length === 0) return;
-
-        // On reset l’input pour pouvoir re-sélectionner les mêmes fichiers plus tard
+        // reset pour pouvoir re-sélectionner les mêmes fichiers plus tard
         event.target.value = "";
+        void handleFiles(files);
+    };
 
-        // On limite si on dépasse le max
-        const remainingSlots = maxImages - imageUrls.length;
-        const filesToUpload = files.slice(0, remainingSlots);
-        if (filesToUpload.length === 0) return;
+    // --- Drag & drop handlers ---
 
-        setUploading(true);
-
-        const newUrls: string[] = [];
-
-        try {
-            for (const file of filesToUpload) {
-                const fd = new FormData();
-                fd.append("file", file);
-
-                const res = await fetch("/api/listings/images", {
-                    method: "POST",
-                    body: fd,
-                });
-
-                const data = await res.json().catch(() => null);
-
-                if (!res.ok || !data?.publicUrl) {
-                    console.error("Erreur upload image listing :", data);
-                    continue;
-                }
-
-                newUrls.push(data.publicUrl);
-            }
-
-            if (newUrls.length > 0) {
-                const updated = [...imageUrls, ...newUrls];
-
-                // Mode contrôlé : on délègue au parent
-                if (value !== undefined) {
-                    onChange?.(updated);
-                } else {
-                    // Mode non contrôlé : on gère l'état local
-                    setInternalUrls(updated);
-                    onChange?.(updated);
-                }
-            }
-        } catch (err) {
-            console.error("Erreur inattendue lors de l’upload d’images :", err);
-        } finally {
-            setUploading(false);
+    const handleDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!canAddMore) return;
+        if (!isDragging) {
+            setIsDragging(true);
         }
+    };
+
+    const handleDragLeave: React.DragEventHandler<HTMLDivElement> = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        // on évite les flickers en ne reset que si on sort vraiment de la zone
+        if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+        setIsDragging(false);
+    };
+
+    const handleDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setIsDragging(false);
+
+        if (!canAddMore) return;
+
+        const droppedFiles = Array.from(event.dataTransfer.files ?? []);
+        if (droppedFiles.length === 0) return;
+
+        void handleFiles(droppedFiles);
     };
 
     const handleRemove = (urlToRemove: string) => {
@@ -106,69 +140,88 @@ export function ImageUpload({
         }
     };
 
-    const hasReachedLimit = imageUrls.length >= maxImages;
-
     return (
         <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-                {/* Vignettes des images déjà uploadées */}
-                {imageUrls.map((url, index) => (
-                    <div
-                        key={index}
-                        className="relative h-24 w-24 overflow-hidden rounded-lg border bg-muted"
-                    >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src={url}
-                            alt={`Image ${index + 1}`}
-                            className="h-full w-full object-cover"
-                        />
+            {/* Zone drop principale */}
+            <div
+                className={[
+                    "flex flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/40 px-4 py-5 text-center transition-colors",
+                    canAddMore ? "cursor-pointer" : "cursor-not-allowed opacity-70",
+                    isDragging ? "border-primary/60 bg-muted/70" : "border-border",
+                    uploading ? "opacity-80" : "",
+                ].join(" ")}
+                onClick={canAddMore ? triggerFilePicker : undefined}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+            >
+                <p className="text-sm font-medium">
+                    {canAddMore
+                        ? "Glissez-déposez vos photos ici"
+                        : "Nombre maximum de photos atteint"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                    ou cliquez pour sélectionner des images (JPG, PNG, max {maxImages})
+                </p>
 
-                        <button
-                            type="button"
-                            onClick={() => handleRemove(url)}
-                            className="absolute right-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white"
-                        >
-                            X
-                        </button>
-                    </div>
-                ))}
-
-                {/* Tuile “ajouter une image” */}
-                {!hasReachedLimit && (
-                    <button
-                        type="button"
-                        onClick={handleClickAdd}
-                        className="flex h-24 w-24 flex-col items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground hover:bg-muted/40"
-                    >
-                        <ImagePlus className="mb-1 h-6 w-6" />
-                        <span>Ajouter</span>
-                    </button>
+                {uploading && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        Upload en cours…
+                    </p>
                 )}
             </div>
 
-            {/* Bouton + input */}
-            <div className="flex items-center gap-3">
+            {/* Vignettes */}
+            {imageUrls.length > 0 && (
+                <div className="flex flex-wrap gap-3">
+                    {imageUrls.map((url) => (
+                        <div
+                            key={url}
+                            className="relative h-24 w-24 overflow-hidden rounded-xl border bg-muted"
+                        >
+                            <img
+                                src={url}
+                                alt="Photo d’annonce"
+                                className="h-full w-full object-cover"
+                            />
+                            <button
+                                type="button"
+                                className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-background/90 text-[10px] text-foreground shadow"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemove(url);
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Bouton secondaire + input file caché */}
+            <div className="flex items-center justify-between">
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={handleClickAdd}
-                    disabled={uploading || hasReachedLimit}
+                    disabled={!canAddMore}
+                    onClick={triggerFilePicker}
                 >
-                    {uploading ? "Upload en cours..." : "Ajouter des images"}
+                    Ajouter des images
                 </Button>
-                <span className="text-xs text-muted-foreground">
-          {imageUrls.length}/{maxImages} images
-        </span>
+                <p className="text-xs text-muted-foreground">
+                    {imageUrls.length} / {maxImages} photos
+                </p>
             </div>
 
             <input
                 ref={fileInputRef}
                 type="file"
+                className="hidden"
                 accept="image/*"
                 multiple
-                className="hidden"
                 onChange={handleFilesSelected}
             />
         </div>

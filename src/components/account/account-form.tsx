@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import React, { FormEvent, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -66,12 +66,23 @@ interface AccountFormProps {
   onDeleteAvatar?: () => void;
 }
 
-export function AccountForm({ profile, email, address, onSubmit, onChangePasswordClick, onAvatarFileSelected, onDeleteAvatar,}: AccountFormProps) {
+export function AccountForm({
+                              profile,
+                              email,
+                              address,
+                              onSubmit,
+                              onChangePasswordClick,
+                              onAvatarFileSelected,
+                              onDeleteAvatar,
+                            }: AccountFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gender, setGender] = useState<Gender>(
       (profile.gender as Gender) || "unspecified",
   );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // 🔹 État pour le drag & drop sur l'avatar
+  const [isAvatarDragOver, setIsAvatarDragOver] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -109,23 +120,54 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
     fileInputRef.current?.click();
   };
 
-// Toujours avoir un libellé de base pour générer des initiales
+  // 🔹 Helper commun pour input file + drag & drop
+  const handleNewAvatarFile = (file: File | null) => {
+    if (onAvatarFileSelected) {
+      onAvatarFileSelected(file);
+    }
+  };
+
+  const handleAvatarInputChange = (
+      event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0] ?? null;
+    handleNewAvatarFile(file);
+  };
+
+  const handleAvatarDragOver = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsAvatarDragOver(true);
+  };
+
+  const handleAvatarDragLeave = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsAvatarDragOver(false);
+  };
+
+  const handleAvatarDrop = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsAvatarDragOver(false);
+
+    const file = event.dataTransfer.files?.[0] ?? null;
+    if (!file) return;
+
+    handleNewAvatarFile(file);
+  };
+
+  // Toujours avoir un libellé de base pour générer des initiales
   const displayLabel =
-      profile.displayName?.trim() ||
-      email?.trim() ||
-      "Elan utilisateur";
+      profile.displayName?.trim() || email?.trim() || "Elan utilisateur";
 
-  const initials =
-      displayLabel
-          .split(" ")
-          .filter(Boolean)
-          .map((part) => part[0])
-          .slice(0, 2)
-          .join("")
-          .toUpperCase();
-
-  // const defaultGender: Gender =
-  //     (profile.gender as Gender) || "unspecified";
+  const initials = displayLabel
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
 
   const rawAvatarUrl = profile.avatarUrl ?? undefined;
 
@@ -147,25 +189,29 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
             </p>
           </div>
 
-          {/* Avatar cliquable avec hover sombre */}
+          {/* Avatar cliquable avec drag & drop */}
           <div className="flex flex-col items-center gap-2 md:items-end">
             <div className="relative h-16 w-16">
-              {/* Avatar cliquable */}
               <button
                   type="button"
                   onClick={handleClickAvatar}
-                  className="group h-16 w-16 rounded-full"
-                  aria-label="Modifier la photo de profil"
+                  onDragOver={handleAvatarDragOver}
+                  onDragLeave={handleAvatarDragLeave}
+                  onDrop={handleAvatarDrop}
+                  className={`group h-16 w-16 rounded-full transition ${
+                      isAvatarDragOver ? "ring-2 ring-primary/60 ring-offset-2" : ""
+                  }`}
+                  aria-label="Modifier la photo de profil (clic ou glisser-déposer une image)"
               >
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={safeAvatarUrl} alt={displayLabel}/>
+                  <AvatarImage src={safeAvatarUrl} alt={displayLabel} />
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
 
-                <div className="pointer-events-none absolute inset-0 rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100"/>
+                <div className="pointer-events-none absolute inset-0 rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100" />
 
                 {isSubmitting && (
-                    <span className="absolute inset-0 flex items-center justify-center rounded-full text-xs text-white"></span>
+                    <span className="absolute inset-0 flex items-center justify-center rounded-full text-xs text-white" />
                 )}
               </button>
 
@@ -175,29 +221,31 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
                   <button
                       type="button"
                       className="
-                            absolute
-                            bottom-0
-                            right-0
-                            h-7
-                            w-7
-                            rounded-full
-                            bg-background
-                            shadow
-                            flex
-                            items-center
-                            justify-center
-                            border
-                            border-border
-                          "
+                    absolute
+                    bottom-0
+                    right-0
+                    flex
+                    h-7
+                    w-7
+                    items-center
+                    justify-center
+                    rounded-full
+                    border
+                    border-border
+                    bg-background
+                    shadow
+                  "
                       aria-label="Supprimer la photo de profil"
                   >
-                    <AppIcon name="trash" size={16}/>
+                    <AppIcon name="trash" size={16} />
                   </button>
                 </AlertDialogTrigger>
 
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Supprimer la photo de profil ?</AlertDialogTitle>
+                    <AlertDialogTitle>
+                      Supprimer la photo de profil ?
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
                       Cette action va supprimer définitivement votre photo de profil. Vous
                       pourrez en ajouter une nouvelle plus tard si vous le souhaitez.
@@ -205,7 +253,11 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Annuler</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => {onDeleteAvatar?.();}}>
+                    <AlertDialogAction
+                        onClick={() => {
+                          onDeleteAvatar?.();
+                        }}
+                    >
                       Supprimer
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -219,95 +271,96 @@ export function AccountForm({ profile, email, address, onSubmit, onChangePasswor
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0] ?? null;
-                  if (onAvatarFileSelected) onAvatarFileSelected(file);
-                }}
+                onChange={handleAvatarInputChange}
             />
           </div>
         </div>
 
-          {/* Champs du formulaire */
-          }
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Username */}
-            <div className="space-y-2">
-              <Label htmlFor="username">Nom d’utilisateur</Label>
-              <Input
-                  id="username"
-                  name="username"
-                  placeholder="ex. marie_lem"
-                  defaultValue={profile.username ?? ""}
-              />
-            </div>
+        {/* Champs du formulaire */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Username */}
+          <div className="space-y-2">
+            <Label htmlFor="username">Nom d’utilisateur</Label>
+            <Input
+                id="username"
+                name="username"
+                placeholder="ex. marie_lem"
+                defaultValue={profile.username ?? ""}
+            />
+          </div>
 
-            {/* Email */}
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" name="email" type="email" defaultValue={email}/>
-            </div>
+          {/* Email */}
+          <div className="space-y-2">
+            <Label htmlFor="email">E-mail</Label>
+            <Input id="email" name="email" type="email" defaultValue={email} />
+          </div>
 
-            {/* Prénom */}
-            <div className="space-y-2">
-              <Label htmlFor="firstName">Prénom</Label>
-              <Input
-                  id="firstName"
-                  name="firstName"
-                  defaultValue={profile.firstName ?? ""}
-              />
-            </div>
+          {/* Prénom */}
+          <div className="space-y-2">
+            <Label htmlFor="firstName">Prénom</Label>
+            <Input
+                id="firstName"
+                name="firstName"
+                defaultValue={profile.firstName ?? ""}
+            />
+          </div>
 
-            {/* Nom */}
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Nom</Label>
-              <Input
-                  id="lastName"
-                  name="lastName"
-                  defaultValue={profile.lastName ?? ""}
-              />
-            </div>
+          {/* Nom */}
+          <div className="space-y-2">
+            <Label htmlFor="lastName">Nom</Label>
+            <Input
+                id="lastName"
+                name="lastName"
+                defaultValue={profile.lastName ?? ""}
+            />
+          </div>
 
-            {/* Téléphone */}
-            <div className="space-y-2">
-              <Label htmlFor="phone">Téléphone</Label>
-              <Input
-                  id="phone"
-                  name="phone"
-                  defaultValue={profile.phoneNumber ?? ""}
-              />
-            </div>
+          {/* Téléphone */}
+          <div className="space-y-2">
+            <Label htmlFor="phone">Téléphone</Label>
+            <Input
+                id="phone"
+                name="phone"
+                defaultValue={profile.phoneNumber ?? ""}
+            />
+          </div>
 
-            {/* Genre */}
-            <div className="space-y-2">
-              <Label htmlFor="gender">Genre</Label>
-              <Select value={gender} onValueChange={(value) => setGender(value as Gender)}>
-                <SelectTrigger id="gender">
-                  <SelectValue placeholder="Sélectionner"/>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="female">Femme</SelectItem>
-                  <SelectItem value="male">Homme</SelectItem>
-                  <SelectItem value="other">Autre</SelectItem>
-                  <SelectItem value="unspecified">Préférer ne pas répondre</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Genre */}
+          <div className="space-y-2">
+            <Label htmlFor="gender">Genre</Label>
+            <Select
+                value={gender}
+                onValueChange={(value) => setGender(value as Gender)}
+            >
+              <SelectTrigger id="gender">
+                <SelectValue placeholder="Sélectionner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="female">Femme</SelectItem>
+                <SelectItem value="male">Homme</SelectItem>
+                <SelectItem value="other">Autre</SelectItem>
+                <SelectItem value="unspecified">
+                  Préférer ne pas répondre
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Adresse – Ligne 1 */}
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="address">Adresse</Label>
-              <Input
-                  id="address"
-                  name="address"
-                  placeholder="12 rue des Fleurs"
-                  defaultValue={address?.line1 ?? ""}
-              />
-            </div>
+          {/* Adresse – Ligne 1 */}
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="address">Adresse</Label>
+            <Input
+                id="address"
+                name="address"
+                placeholder="12 rue des Fleurs"
+                defaultValue={address?.line1 ?? ""}
+            />
+          </div>
 
-            {/* Code postal */}
-            <div className="space-y-2">
-              <Label htmlFor="postcode">Code postal</Label>
-              <Input
+          {/* Code postal */}
+          <div className="space-y-2">
+            <Label htmlFor="postcode">Code postal</Label>
+            <Input
                 id="postcode"
                 name="postcode"
                 placeholder="75000"

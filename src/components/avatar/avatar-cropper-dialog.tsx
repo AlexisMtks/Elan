@@ -19,6 +19,9 @@ interface AvatarCropperDialogProps {
     onCropped: (blob: Blob) => void;
 }
 
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
+
 export function AvatarCropperDialog({
                                         open,
                                         onOpenChange,
@@ -31,9 +34,7 @@ export function AvatarCropperDialog({
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
     const [loading, setLoading] = useState(false);
 
-    // Met à jour l'URL locale dès que le fichier change
     useEffect(() => {
-        // Aucun fichier -> reset complet
         if (!file) {
             if (imageUrl) {
                 URL.revokeObjectURL(imageUrl);
@@ -45,7 +46,6 @@ export function AvatarCropperDialog({
             return;
         }
 
-        // Nouveau fichier -> créer une nouvelle URL + reset du crop
         const url = URL.createObjectURL(file);
 
         setImageUrl((prev) => {
@@ -59,7 +59,6 @@ export function AvatarCropperDialog({
         setZoom(1);
         setCrop({ x: 0, y: 0 });
 
-        // Cleanup si le composant est démonté ou si le fichier change
         return () => {
             URL.revokeObjectURL(url);
         };
@@ -70,7 +69,7 @@ export function AvatarCropperDialog({
         (_croppedArea: Area, croppedAreaPixels: Area) => {
             setCroppedAreaPixels(croppedAreaPixels);
         },
-        []
+        [],
     );
 
     const handleClose = () => {
@@ -109,12 +108,14 @@ export function AvatarCropperDialog({
                             image={imageUrl}
                             crop={crop}
                             zoom={zoom}
-                            aspect={1} // carré pour avatar
+                            aspect={1}
                             cropShape="round"
                             showGrid={false}
                             onCropChange={setCrop}
                             onZoomChange={(value) => setZoom(value)}
                             onCropComplete={onCropComplete}
+                            minZoom={MIN_ZOOM}
+                            maxZoom={MAX_ZOOM}
                         />
                     )}
                 </div>
@@ -123,9 +124,9 @@ export function AvatarCropperDialog({
                     <p className="text-sm text-muted-foreground">Zoom</p>
                     <Slider
                         value={[zoom]}
-                        min={1}
-                        max={3}
-                        step={0.1}
+                        min={MIN_ZOOM}
+                        max={MAX_ZOOM}
+                        step={0.05}
                         onValueChange={([value]) => setZoom(value)}
                     />
                 </div>
@@ -143,9 +144,6 @@ export function AvatarCropperDialog({
     );
 }
 
-/**
- * Convertit la zone recadrée en Blob JPEG carré (ex: 512x512)
- */
 async function getCroppedImg(imageSrc: string, crop: Area): Promise<Blob> {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
         const img = new Image();
@@ -155,7 +153,7 @@ async function getCroppedImg(imageSrc: string, crop: Area): Promise<Blob> {
     });
 
     const canvas = document.createElement("canvas");
-    const size = 512; // taille finale de l’avatar
+    const size = 512;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
@@ -176,7 +174,7 @@ async function getCroppedImg(imageSrc: string, crop: Area): Promise<Blob> {
         0,
         0,
         size,
-        size
+        size,
     );
 
     return new Promise<Blob>((resolve, reject) => {
@@ -189,7 +187,7 @@ async function getCroppedImg(imageSrc: string, crop: Area): Promise<Blob> {
                 resolve(blob);
             },
             "image/jpeg",
-            0.9
+            0.9,
         );
     });
 }
