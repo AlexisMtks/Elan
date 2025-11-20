@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AppIcon } from "@/components/misc/app-icon";
+import { Textarea } from "@/components/ui/textarea";
 
 type Gender = "female" | "male" | "other" | "unspecified";
 
@@ -38,6 +39,7 @@ interface AccountFormValues {
   city: string;
   country: string;
   gender: Gender;
+  bio: string;
 }
 
 interface AccountFormProps {
@@ -81,14 +83,12 @@ export function AccountForm({
   );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 🔹 État pour le drag & drop sur l'avatar
   const [isAvatarDragOver, setIsAvatarDragOver] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!onSubmit) {
-      // Fallback si jamais onSubmit n'est pas fourni
       alert("Simulation : les informations du compte ont été enregistrées.");
       return;
     }
@@ -97,7 +97,8 @@ export function AccountForm({
 
     const values: AccountFormValues = {
       username: (formData.get("username") as string) ?? "",
-      email: (formData.get("email") as string) ?? "",
+      // email est bloqué en lecture seule → on renvoie la valeur de la prop
+      email,
       firstName: (formData.get("firstName") as string) ?? "",
       lastName: (formData.get("lastName") as string) ?? "",
       phone: (formData.get("phone") as string) ?? "",
@@ -106,6 +107,7 @@ export function AccountForm({
       city: (formData.get("city") as string) ?? "",
       country: (formData.get("country") as string) ?? "",
       gender,
+      bio: (formData.get("bio") as string) ?? "",
     };
 
     try {
@@ -120,7 +122,6 @@ export function AccountForm({
     fileInputRef.current?.click();
   };
 
-  // 🔹 Helper commun pour input file + drag & drop
   const handleNewAvatarFile = (file: File | null) => {
     if (onAvatarFileSelected) {
       onAvatarFileSelected(file);
@@ -157,7 +158,6 @@ export function AccountForm({
     handleNewAvatarFile(file);
   };
 
-  // Toujours avoir un libellé de base pour générer des initiales
   const displayLabel =
       profile.displayName?.trim() || email?.trim() || "Elan utilisateur";
 
@@ -204,18 +204,20 @@ export function AccountForm({
                   aria-label="Modifier la photo de profil (clic ou glisser-déposer une image)"
               >
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={safeAvatarUrl} alt={displayLabel} />
+                  <AvatarImage src={safeAvatarUrl} alt={displayLabel}/>
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
 
-                <div className="pointer-events-none absolute inset-0 rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100" />
+                <div
+                    className="pointer-events-none absolute inset-0 rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100"/>
 
                 {isSubmitting && (
-                    <span className="absolute inset-0 flex items-center justify-center rounded-full text-xs text-white" />
+                    <span
+                        className="absolute inset-0 flex items-center justify-center rounded-full text-xs text-white"/>
                 )}
               </button>
 
-              {/* Bouton supprimer avatar + popup de confirmation */}
+              {/* Bouton supprimer avatar */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <button
@@ -237,7 +239,7 @@ export function AccountForm({
                   "
                       aria-label="Supprimer la photo de profil"
                   >
-                    <AppIcon name="trash" size={16} />
+                    <AppIcon name="trash" size={16}/>
                   </button>
                 </AlertDialogTrigger>
 
@@ -247,8 +249,9 @@ export function AccountForm({
                       Supprimer la photo de profil ?
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                      Cette action va supprimer définitivement votre photo de profil. Vous
-                      pourrez en ajouter une nouvelle plus tard si vous le souhaitez.
+                      Cette action va supprimer définitivement votre photo de
+                      profil. Vous pourrez en ajouter une nouvelle plus tard si
+                      vous le souhaitez.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -265,7 +268,6 @@ export function AccountForm({
               </AlertDialog>
             </div>
 
-            {/* Input fichier caché */}
             <input
                 ref={fileInputRef}
                 type="file"
@@ -289,10 +291,17 @@ export function AccountForm({
             />
           </div>
 
-          {/* Email */}
+          {/* Email (non modifiable pour l’instant) */}
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
-            <Input id="email" name="email" type="email" defaultValue={email} />
+            <Input
+                id="email"
+                name="email"
+                type="email"
+                defaultValue={email}
+                readOnly
+                className="bg-muted/40 cursor-not-allowed"
+            />
           </div>
 
           {/* Prénom */}
@@ -333,7 +342,7 @@ export function AccountForm({
                 onValueChange={(value) => setGender(value as Gender)}
             >
               <SelectTrigger id="gender">
-                <SelectValue placeholder="Sélectionner" />
+                <SelectValue placeholder="Sélectionner"/>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="female">Femme</SelectItem>
@@ -387,6 +396,18 @@ export function AccountForm({
                 name="country"
                 placeholder="France"
                 defaultValue={address?.country ?? profile.country ?? ""}
+            />
+          </div>
+
+          {/* Bio / description */}
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="bio">Description</Label>
+            <Textarea
+                id="bio"
+                name="bio"
+                placeholder="Parlez un peu de vous, de votre expérience en gymnastique, de ce que vous vendez..."
+                defaultValue={profile.bio ?? ""}
+                className="min-h-[96px] text-sm"
             />
           </div>
         </div>
