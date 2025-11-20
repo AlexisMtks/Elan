@@ -1,11 +1,20 @@
 // src/app/research/page.tsx
 import { FilterPanel } from "@/components/filters/filter-panel";
 import { FilterChips } from "@/components/filters/filter-chips";
-import { ProductCard } from "@/components/cards/product-card";
 import { PageTitle } from "@/components/misc/page-title";
 import { SearchListingsGrid } from "@/components/listing/search-listings-grid";
 import { SuggestedListingsGrid } from "@/components/listing/suggested-listings-grid";
 import { supabase } from "@/lib/supabaseClient";
+
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { SlidersHorizontal } from "lucide-react";
 
 type CategoryValue = "all" | "agres" | "tapis" | "accessoires";
 type ConditionValue = "new" | "like_new" | "very_good" | "good" | "used";
@@ -298,32 +307,63 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     // 3) Rendu
     // ----------------------------
     return (
-        <div className="flex gap-8">
-            <FilterPanel />
+        <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
+            {/* Bouton Filtres - seulement sur mobile */}
+            <div className="mb-4 md:hidden">
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button
+                            variant="outline"
+                            className="w-full justify-center gap-2 rounded-full text-sm font-medium"
+                        >
+                            <SlidersHorizontal className="h-4 w-4" />
+                            Filtres
+                        </Button>
+                    </DialogTrigger>
 
-            <div className="flex-1 space-y-2">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-3">
-                        <PageTitle title={title} />
-                        <FilterChips filters={activeFilters} />
-                    </div>
+                    <DialogContent className="max-h-[90vh] w-[95vw] max-w-md overflow-y-auto rounded-3xl p-0">
+                        <DialogHeader className="px-6 pt-6 pb-0">
+                            <DialogTitle>Filtres</DialogTitle>
+                        </DialogHeader>
+                        <div className="px-6 pb-6">
+                            <FilterPanel />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
 
-                    <div className="text-sm text-muted-foreground">
-                        Trier par : <span className="font-medium">Prix croissant</span>
-                    </div>
+            <div className="flex flex-col gap-6 md:flex-row md:gap-8">
+                {/* Panneau de filtres : seulement à partir de md */}
+                <div className="hidden md:block md:w-80 md:flex-none">
+                    <FilterPanel />
                 </div>
 
-                {error && (
-                    <p className="text-sm text-red-600">
-                        Impossible de charger les résultats pour le moment.
-                    </p>
-                )}
+                {/* Résultats */}
+                <div className="flex-1 space-y-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-3">
+                            <PageTitle title={title} />
+                            <FilterChips filters={activeFilters} />
+                        </div>
 
-                <SearchListingsGrid listings={listings} hasError={!!error} />
+                        <div className="text-sm text-muted-foreground">
+                            Trier par :{" "}
+                            <span className="font-medium">Prix croissant</span>
+                        </div>
+                    </div>
 
-                {otherListings.length > 0 && (
-                    <SuggestedListingsGrid listings={otherListings} />
-                )}
+                    {error && (
+                        <p className="text-sm text-red-600">
+                            Impossible de charger les résultats pour le moment.
+                        </p>
+                    )}
+
+                    <SearchListingsGrid listings={listings} hasError={!!error} />
+
+                    {otherListings.length > 0 && (
+                        <SuggestedListingsGrid listings={otherListings} />
+                    )}
+                </div>
             </div>
         </div>
     );
