@@ -169,7 +169,7 @@ export function Header({ variant = "default" }: HeaderProps) {
 
   return (
       <header className="border-b bg-background/80">
-        <div className="mx-auto flex max-w-[1440px] items-center gap-6 px-6 py-4">
+        <div className="mx-auto flex max-w-[1440px] items-center gap-3 px-4 py-3 md:gap-6 md:px-6 md:py-4">
           {/* Logo */}
           <Link href="/" className="flex items-center">
             {/* LOGO MOBILE */}
@@ -219,19 +219,44 @@ export function Header({ variant = "default" }: HeaderProps) {
 
           {/* Barre de recherche */}
           {showSearch && (
-              <form className="flex-1" onSubmit={handleSearchSubmit}>
-                <Input
-                    placeholder="Rechercher…"
-                    className="rounded-full translate-y-[1px]"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
-              </form>
+              <>
+                {/* Desktop : champ de recherche complet */}
+                <form
+                    className="hidden flex-1 md:block"
+                    onSubmit={handleSearchSubmit}
+                >
+                  <Input
+                      placeholder="Rechercher…"
+                      className="rounded-full translate-y-[1px]"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                  />
+                </form>
+
+                {/* Mobile : bouton pill qui renvoie vers la page de recherche */}
+                <Link
+                    href="/research"
+                    className="flex-1 md:hidden"
+                    aria-label="Rechercher un article"
+                >
+                  <Button
+                      variant="outline"
+                      className="w-full justify-start rounded-full px-4 text-sm font-medium"
+                  >
+                    Recherche
+                  </Button>
+                </Link>
+              </>
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/sell">
-              <Button>Vendre un article</Button>
+              <Button
+                  size="sm"
+                  className="whitespace-nowrap rounded-full px-4 text-sm font-semibold"
+              >
+                Vendre un article
+              </Button>
             </Link>
 
             {/* Icône / menu compte */}
@@ -253,7 +278,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     >
                       <Avatar className="h-8 w-8 cursor-pointer">
                         {avatarUrl && (
-                            <AvatarImage src={avatarUrl} alt="Photo de profil" />
+                            <AvatarImage src={avatarUrl} alt="Photo de profil"/>
                         )}
                         <AvatarFallback className="text-xs">
                           {avatarInitials}
@@ -273,15 +298,15 @@ export function Header({ variant = "default" }: HeaderProps) {
                     <DropdownMenuItem onClick={handleToggleTheme}>
                   <span className="mr-2 flex h-4 w-4 items-center justify-center">
                     {theme.mode === "light" ? (
-                        <Moon className="h-4 w-4" />
+                        <Moon className="h-4 w-4"/>
                     ) : (
-                        <Sun className="h-4 w-4" />
+                        <Sun className="h-4 w-4"/>
                     )}
                   </span>
                       {theme.mode === "light" ? "Mode sombre" : "Mode clair"}
                     </DropdownMenuItem>
 
-                    <DropdownMenuSeparator />
+                    <DropdownMenuSeparator/>
                     <DropdownMenuItem onClick={handleLogout}>
                       Se déconnecter
                     </DropdownMenuItem>
