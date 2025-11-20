@@ -19,10 +19,6 @@ interface SellSuccessDialogProps {
     mode: SellMode;
 }
 
-/**
- * Dialog de confirmation utilisé pour l’enregistrement du brouillon
- * et la publication de l’annonce.
- */
 export function SellSuccessDialog({
                                       open,
                                       onOpenChange,
@@ -30,6 +26,11 @@ export function SellSuccessDialog({
                                   }: SellSuccessDialogProps) {
     const router = useRouter();
     const isDraft = mode === "draft";
+
+    const handleNewListing = () => {
+        onOpenChange(false);
+        router.push("/sell");
+    };
 
     const handleGoToListings = () => {
         router.push("/listings");
@@ -44,17 +45,24 @@ export function SellSuccessDialog({
                             ? "Brouillon enregistré"
                             : "Annonce publiée avec succès 🎉"}
                     </DialogTitle>
+
                     <DialogDescription>
                         {isDraft
-                            ? "Votre annonce a été enregistrée en tant que brouillon. Vous pourrez la retrouver et la modifier dans la section “Mes annonces”, onglet Brouillons."
+                            ? "Votre annonce a été enregistrée en tant que brouillon. Vous pourrez la retrouver dans la section “Mes annonces”, onglet Brouillons."
                             : "Votre article est désormais en ligne. Vous pouvez le retrouver dans la section “Mes annonces”."}
                     </DialogDescription>
                 </DialogHeader>
+
                 <DialogFooter className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Fermer
+                    {/* ➕ Créer une nouvelle annonce */}
+                    <Button variant="outline" onClick={handleNewListing}>
+                        Créer une nouvelle annonce
                     </Button>
-                    <Button onClick={handleGoToListings}>Voir mes annonces</Button>
+
+                    {/* ➕ Voir mes annonces */}
+                    <Button onClick={handleGoToListings}>
+                        Voir mes annonces
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

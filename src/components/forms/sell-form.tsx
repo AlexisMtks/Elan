@@ -187,17 +187,24 @@ export function SellForm({
             const trimmedTitle = title.trim();
             const trimmedDescription = description.trim();
             const priceEuros = Number(price);
-            const priceCents =
-                Number.isFinite(priceEuros) && priceEuros >= 0
-                    ? Math.round(priceEuros * 100)
-                    : NaN;
+            const hasValidPrice = Number.isFinite(priceEuros) && priceEuros >= 0;
+            const priceCents = hasValidPrice ? Math.round(priceEuros * 100) : null;
 
-            if (!trimmedTitle || !trimmedDescription || !Number.isFinite(priceCents)) {
-                setErrorMsg(
-                    "Merci de renseigner au minimum le titre, la description et un prix valide.",
-                );
-                return;
+            // 🔒 Validation stricte uniquement pour la publication
+            if (status === "active") {
+                if (!trimmedTitle || !trimmedDescription || priceCents === null) {
+                    setErrorMsg(
+                        "Merci de renseigner au minimum le titre, la description et un prix valide.",
+                    );
+                    return;
+                }
             }
+
+            // 🔓 Pour les brouillons : valeurs de secours
+            const safeTitle =
+                trimmedTitle || (status === "draft" ? "Brouillon sans titre" : "");
+            const safeDescription = trimmedDescription || "";
+            const safePriceCents = priceCents ?? 0;
 
             const categoryId = selectedCategory ? Number(selectedCategory) : null;
 
@@ -208,9 +215,9 @@ export function SellForm({
                     .from("listings")
                     .insert({
                         seller_id: user.id,
-                        title: trimmedTitle,
-                        description: trimmedDescription,
-                        price: priceCents,
+                        title: safeTitle,
+                        description: safeDescription,
+                        price: safePriceCents,
                         currency: "EUR",
                         status,
                         category_id: categoryId,
@@ -244,9 +251,9 @@ export function SellForm({
                 const { error: updateError } = await supabase
                     .from("listings")
                     .update({
-                        title: trimmedTitle,
-                        description: trimmedDescription,
-                        price: priceCents,
+                        title: safeTitle,
+                        description: safeDescription,
+                        price: safePriceCents,
                         status,
                         category_id: categoryId,
                         condition: condition,
@@ -261,6 +268,7 @@ export function SellForm({
                 }
             }
 
+            // Images inchangées
             if (effectiveListingId) {
                 if (formMode === "edit") {
                     const { error: deleteError } = await supabase
@@ -269,10 +277,7 @@ export function SellForm({
                         .eq("listing_id", effectiveListingId);
 
                     if (deleteError) {
-                        console.error(
-                            "Erreur suppression anciennes images :",
-                            deleteError,
-                        );
+                        console.error("Erreur suppression anciennes images :", deleteError);
                     }
                 }
 
@@ -288,10 +293,7 @@ export function SellForm({
                         .insert(rows);
 
                     if (imagesError) {
-                        console.error(
-                            "Erreur insertion listing_images :",
-                            imagesError,
-                        );
+                        console.error("Erreur insertion listing_images :", imagesError);
                     }
                 }
             }
@@ -482,7 +484,7 @@ export function SellForm({
                             type="button"
                             variant="ghost"
                             onClick={goToPrevious}
-                            disabled={currentStep === 0}
+                            disabled={currentStep === 0 || submitting}
                         >
                             Étape précédente
                         </Button>
@@ -497,34 +499,33 @@ export function SellForm({
                                 Annuler
                             </Button>
 
+                            {/* Enregistrer le brouillon — visible sur toutes les étapes */}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleSaveDraft}
+                                disabled={submitting}
+                            >
+                                {submitting && submitMode === "draft"
+                                    ? "Enregistrement..."
+                                    : "Enregistrer en brouillon"}
+                            </Button>
+
+                            {/* Étape suivante ou publication */}
                             {!isLastStep ? (
-                                <Button type="button" onClick={goToNext}>
+                                <Button type="button" onClick={goToNext} disabled={submitting}>
                                     Étape suivante
                                 </Button>
                             ) : (
-                                <>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={handleSaveDraft}
-                                        disabled={submitting}
-                                    >
-                                        {submitting && submitMode === "draft"
-                                            ? "Enregistrement..."
-                                            : formMode === "edit"
-                                                ? "Mettre en brouillon"
-                                                : "Enregistrer le brouillon"}
-                                    </Button>
-                                    <Button type="submit" disabled={submitting}>
-                                        {submitting && submitMode === "publish"
-                                            ? formMode === "edit"
-                                                ? "Mise à jour..."
-                                                : "Publication..."
-                                            : formMode === "edit"
-                                                ? "Mettre à jour l’annonce"
-                                                : "Publier l’annonce"}
-                                    </Button>
-                                </>
+                                <Button type="submit" disabled={submitting}>
+                                    {submitting && submitMode === "publish"
+                                        ? formMode === "edit"
+                                            ? "Mise à jour..."
+                                            : "Publication..."
+                                        : formMode === "edit"
+                                            ? "Mettre à jour l’annonce"
+                                            : "Publier l’annonce"}
+                                </Button>
                             )}
                         </div>
                     </div>
