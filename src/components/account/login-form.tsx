@@ -9,7 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
-export function LoginForm() {
+interface LoginFormProps {
+    redirectTo?: string;
+}
+
+export function LoginForm({ redirectTo = "/account" }: LoginFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -35,11 +39,17 @@ export function LoginForm() {
         }
 
         if (data?.user) {
-            router.push("/account"); // redirection vers le compte
+            // ✅ On renvoie l'utilisateur là d'où il vient
+            router.push(redirectTo);
+            return;
         }
 
         setLoading(false);
     };
+
+    const registerHref = redirectTo
+        ? `/register?redirectTo=${encodeURIComponent(redirectTo)}`
+        : "/register";
 
     return (
         <Card className="mx-auto max-w-md rounded-2xl border p-6">
@@ -75,7 +85,7 @@ export function LoginForm() {
                     <div className="text-center text-xs text-muted-foreground">
                         <span>Pas encore de compte ? </span>
                         <Button variant="link" size="sm" className="px-1" asChild>
-                            <Link href="/register">Créer un compte</Link>
+                            <Link href={registerHref}>Créer un compte</Link>
                         </Button>
                     </div>
                 </div>

@@ -1,3 +1,4 @@
+// src/components/layout/header.tsx (ou équivalent)
 "use client";
 
 import Link from "next/link";
@@ -49,6 +50,15 @@ export function Header({ variant = "default" }: HeaderProps) {
           pathname.startsWith(p),
       );
 
+  // 🔁 petite aide pour récupérer l'URL actuelle (path + query)
+  const getCurrentUrl = () => {
+    if (typeof window === "undefined") {
+      return pathname;
+    }
+    const search = window.location.search || "";
+    return `${pathname}${search}`;
+  };
+
   // Chargement du user + profil (avatar / initiales)
   const loadUserAndProfile = async () => {
     const {
@@ -78,10 +88,7 @@ export function Header({ variant = "default" }: HeaderProps) {
 
     const baseName =
         profile?.display_name ||
-        [profile?.first_name, profile?.last_name]
-            .filter(Boolean)
-            .join(" ")
-            .trim() ||
+        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
         user.email ||
         "ME";
 
@@ -91,10 +98,8 @@ export function Header({ variant = "default" }: HeaderProps) {
 
   // Déterminer si l’utilisateur est connecté + écouter les changements d’auth
   useEffect(() => {
-    // check initial
     void loadUserAndProfile();
 
-    // écoute login/logout
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -156,16 +161,42 @@ export function Header({ variant = "default" }: HeaderProps) {
   };
 
   const handleLogout = async () => {
+    const currentUrl = getCurrentUrl();
+
     await supabase.auth.signOut();
     setIsAuthenticated(false);
     setAvatarUrl(null);
     setAvatarInitials("ME");
-    router.push("/login");
+
+    // Pages protégées de ton app
+    const protectedPaths = [
+      "/account",
+      "/messages",
+      "/sales",
+      "/purchases",
+      "/publications",
+    ];
+
+    const isProtected = protectedPaths.some((p) =>
+        currentUrl.startsWith(p),
+    );
+
+    if (isProtected) {
+      // 🔐 Si on se déconnecte depuis une page protégée → on va sur /login
+      // mais on garde en mémoire où retourner après re-login
+      router.push(`/login?redirectTo=${encodeURIComponent(currentUrl)}`);
+    } else {
+      // 🌐 Sinon on reste sur la même page, mais déconnecté
+      router.push(currentUrl);
+    }
   };
 
   const handleToggleTheme = () => {
     setMode(theme.mode === "light" ? "dark" : "light");
   };
+
+  // 🧭 URL de login incluant la page actuelle comme redirectTo
+  const loginHref = `/login?redirectTo=${encodeURIComponent(getCurrentUrl())}`;
 
   return (
       <header className="border-b bg-background/80">
@@ -174,55 +205,48 @@ export function Header({ variant = "default" }: HeaderProps) {
           <Link href="/" className="flex items-center">
             {/* LOGO MOBILE */}
             <span className="md:hidden flex items-center">
-            {/* version claire */}
-              <Image
-                  src="/logos/logo-light.png"
-                  alt="Élan"
-                  width={200}
-                  height={150}
-                  className="dark:hidden h-8 w-auto -translate-y-[2px]"
-                  priority
-              />
-              {/* version sombre */}
-              <Image
-                  src="/logos/logo-dark.png"
-                  alt="Élan"
-                  width={200}
-                  height={150}
-                  className="hidden dark:block h-8 w-auto -translate-y-[2px]"
-                  priority
-              />
+            <Image
+                src="/logos/logo-light.png"
+                alt="Élan"
+                width={200}
+                height={150}
+                className="dark:hidden h-8 w-auto -translate-y-[2px]"
+                priority
+            />
+            <Image
+                src="/logos/logo-dark.png"
+                alt="Élan"
+                width={200}
+                height={150}
+                className="hidden dark:block h-8 w-auto -translate-y-[2px]"
+                priority
+            />
           </span>
 
             {/* LOGO DESKTOP */}
             <span className="hidden md:flex items-center">
-            {/* version claire */}
-              <Image
-                  src="/logos/logo-light.png"
-                  alt="Élan"
-                  width={400}
-                  height={300}
-                  className="dark:hidden h-9 w-auto -translate-y-[2px]"
-                  priority
-              />
-              {/* version sombre */}
-              <Image
-                  src="/logos/logo-dark.png"
-                  alt="Élan"
-                  width={400}
-                  height={300}
-                  className="hidden dark:block h-9 w-auto -translate-y-[2px]"
-                  priority
-              />
+            <Image
+                src="/logos/logo-light.png"
+                alt="Élan"
+                width={400}
+                height={300}
+                className="dark:hidden h-9 w-auto -translate-y-[2px]"
+                priority
+            />
+            <Image
+                src="/logos/logo-dark.png"
+                alt="Élan"
+                width={400}
+                height={300}
+                className="hidden dark:block h-9 w-auto -translate-y-[2px]"
+                priority
+            />
           </span>
           </Link>
 
           {/* Barre de recherche */}
           {showSearch && (
-              <form
-                  className="flex-1"
-                  onSubmit={handleSearchSubmit}
-              >
+              <form className="flex-1" onSubmit={handleSearchSubmit}>
                 <Input
                     placeholder="Rechercher…"
                     className="h-9 rounded-full translate-y-[1px] text-sm md:h-10"
@@ -244,14 +268,14 @@ export function Header({ variant = "default" }: HeaderProps) {
 
             {/* Icône / menu compte */}
             {!isAuthenticated ? (
-                // Utilisateur non connecté : lien direct vers la page de connexion
-                <Link href="/login" aria-label="Mon compte">
+                // 🔑 Utilisateur non connecté : lien vers /login avec redirectTo
+                <Link href={loginHref} aria-label="Mon compte">
                   <Avatar className="h-8 w-8 cursor-pointer">
                     <AvatarFallback className="text-xs">ME</AvatarFallback>
                   </Avatar>
                 </Link>
             ) : (
-                // Utilisateur connecté : avatar réel (ou initiales) dans le menu
+                // Utilisateur connecté : menu compte
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -261,7 +285,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     >
                       <Avatar className="h-8 w-8 cursor-pointer">
                         {avatarUrl && (
-                            <AvatarImage src={avatarUrl} alt="Photo de profil"/>
+                            <AvatarImage src={avatarUrl} alt="Photo de profil" />
                         )}
                         <AvatarFallback className="text-xs">
                           {avatarInitials}
@@ -281,15 +305,15 @@ export function Header({ variant = "default" }: HeaderProps) {
                     <DropdownMenuItem onClick={handleToggleTheme}>
                   <span className="mr-2 flex h-4 w-4 items-center justify-center">
                     {theme.mode === "light" ? (
-                        <Moon className="h-4 w-4"/>
+                        <Moon className="h-4 w-4" />
                     ) : (
-                        <Sun className="h-4 w-4"/>
+                        <Sun className="h-4 w-4" />
                     )}
                   </span>
                       {theme.mode === "light" ? "Mode sombre" : "Mode clair"}
                     </DropdownMenuItem>
 
-                    <DropdownMenuSeparator/>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
                       Se déconnecter
                     </DropdownMenuItem>

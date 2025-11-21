@@ -3,9 +3,16 @@
 import { PageTitle } from "@/components/misc/page-title";
 import { LoginForm } from "@/components/account/login-form";
 import { useRedirectIfAuth } from "@/hooks/use-redirect-if-auth";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
-    const { checking } = useRedirectIfAuth();
+    // On récupère le paramètre redirectTo si présent
+    const searchParams = useSearchParams();
+    const redirectTo = searchParams.get("redirectTo") || "/";
+
+    // On passe redirectTo au hook
+    // Pour que si l'utilisateur est déjà connecté, il soit renvoyé sur cette page
+    const { checking } = useRedirectIfAuth(redirectTo);
 
     if (checking) {
         return (
@@ -22,7 +29,8 @@ export default function LoginPage() {
                 subtitle="Accédez à votre compte Élan pour gérer vos annonces, vos ventes et vos achats."
             />
 
-            <LoginForm />
+            {/* 🔥 On transmet redirectTo au formulaire */}
+            <LoginForm redirectTo={redirectTo} />
         </div>
     );
 }
