@@ -47,7 +47,7 @@ type DbOrderRow = {
     shipping_postcode: string | null;
     shipping_country: string | null;
     estimated_delivery_date: string | null;
-    seller: DbSellerRow[] | null;
+    seller: DbSellerRow; // 👈 objet, plus un tableau
     order_items: DbOrderItemRow[] | null;
 };
 
@@ -123,11 +123,10 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
     const firstItem = order.order_items?.[0] ?? null;
 
     // 💰 Prix : total de la commande ou snapshot de la première ligne
-    const priceCents =
-        order.total_amount ?? firstItem?.price_snapshot ?? 0;
+    const priceCents = order.total_amount ?? firstItem?.price_snapshot ?? 0;
 
-    // 👤 Vendeur
-    const sellerRow = order.seller?.[0] ?? null;
+    // 👤 Vendeur (objet direct, plus de tableau)
+    const sellerRow = order.seller ?? null;
 
     // 📦 Adresse
     const addressLine1 =

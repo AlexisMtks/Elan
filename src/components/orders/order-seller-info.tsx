@@ -7,23 +7,29 @@ import { SellerCard } from "@/components/listing/seller-card";
 interface OrderSellerInfoProps {
     id: string;
     name: string;
-    listingsCount: number;
+    listingsCount: number; // fallback initial
 }
 
 /**
  * Bloc d'informations sur le vendeur pour le détail de commande,
  * basé sur la carte vendeur réutilisable (SellerCard).
- * On recalcule ici le nombre d'annonces actives du vendeur.
+ * Recalcule en temps réel le nombre d'annonces actives du vendeur.
  */
-export function OrderSellerInfo(props: OrderSellerInfoProps) {
+export function OrderSellerInfo({ id, name, listingsCount }: OrderSellerInfoProps) {
     const [activeListingsCount, setActiveListingsCount] = useState<number | null>(null);
 
     useEffect(() => {
-        const fetchActiveListingsCount = async () => {
+        // 🛑 Sécurité : si le seller_id est vide → ne pas faire de requête
+        if (!id) {
+            setActiveListingsCount(null);
+            return;
+        }
+
+        const fetchActiveListings = async () => {
             const { count, error } = await supabase
                 .from("listings")
-                .select("id", { count: "exact", head: true })
-                .eq("seller_id", props.id)
+                .select("id", { head: true, count: "exact" })
+                .eq("seller_id", id)
                 .eq("status", "active");
 
             if (!error) {
@@ -31,19 +37,20 @@ export function OrderSellerInfo(props: OrderSellerInfoProps) {
             }
         };
 
-        void fetchActiveListingsCount();
-    }, [props.id]);
+        void fetchActiveListings();
+    }, [id]);
 
-    const effectiveListingsCount =
-        activeListingsCount !== null ? activeListingsCount : props.listingsCount ?? 0;
+    // Si la requête n'a pas encore répondu, on affiche la valeur fournie par le serveur
+    const displayedListingsCount =
+        activeListingsCount !== null ? activeListingsCount : listingsCount;
 
     return (
         <div className="space-y-3">
             <p className="text-sm font-semibold">Vendeur</p>
             <SellerCard
-                id={props.id}
-                name={props.name}
-                listingsCount={effectiveListingsCount}
+                id={id}
+                name={name}
+                listingsCount={displayedListingsCount}
                 showContactButton
                 showProfileButton
             />
