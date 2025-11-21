@@ -15,7 +15,6 @@ type HomeProduct = {
 };
 
 export default async function HomePage() {
-    // Récupération des annonces actives les plus récentes
     const { data, error } = await supabase
         .from("listings")
         .select(
@@ -34,9 +33,9 @@ export default async function HomePage() {
         )
         .eq("status", "active")
         .order("created_at", { ascending: false })
-        .limit(20) // 🔁 on récupère plus que 4 pour pouvoir compenser les annonces de l'utilisateur
-        .order("position", { foreignTable: "listing_images", ascending: true }) // trie des images
-        .limit(1, { foreignTable: "listing_images" }); // une seule image par annonce
+        .limit(30) // 🔁 on prend un peu de marge pour pouvoir en garder 10 après filtrage
+        .order("position", { foreignTable: "listing_images", ascending: true })
+        .limit(1, { foreignTable: "listing_images" });
 
     const products: HomeProduct[] = (data ?? []).map((row: any) => {
         const firstImage =
@@ -58,7 +57,7 @@ export default async function HomePage() {
     return (
         <div className="space-y-10">
             {/* Hero */}
-            <section className="space-y-6">
+            <section className="space-y-2">
                 <PageTitle
                     title="La plateforme dédiée à la gymnastique"
                     subtitle="Achetez et revendez du matériel de gymnastique artistique en toute confiance."
@@ -67,11 +66,11 @@ export default async function HomePage() {
             </section>
 
             {/* Produits récents */}
-            <section className="space-y-4">
+            <section className="space-y-2">
                 <h2 className="text-xl font-semibold">Produits récents</h2>
 
                 {error && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-red-600 sapece-y-6">
                         Impossible de charger les produits pour le moment.
                     </p>
                 )}
