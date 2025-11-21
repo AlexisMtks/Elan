@@ -1,13 +1,20 @@
 import { ProgressSteps } from "@/components/steps/progress-steps";
 
+export type OrderStatusStepId =
+    | "placed"
+    | "processing"
+    | "shipped"
+    | "delivered";
+
 interface OrderStatusBarProps {
-    currentStatus: "placed" | "shipped" | "delivered";
+    currentStatus: OrderStatusStepId;
 }
 
-const ORDER_STEPS = [
-  { id: "placed", label: "Commande passée" },
-  { id: "shipped", label: "Expédiée" },
-  { id: "delivered", label: "Livrée" },
+const ORDER_STEPS: { id: OrderStatusStepId; label: string }[] = [
+    { id: "placed",      label: "Commande passée" },
+    { id: "processing",  label: "Préparation" },
+    { id: "shipped",     label: "Expédiée" },
+    { id: "delivered",   label: "Livrée" },
 ];
 
 /**

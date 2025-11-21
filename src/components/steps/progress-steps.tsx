@@ -117,7 +117,7 @@ function BarSteps({
             {/* Barre horizontale */}
             <div className="relative h-1 rounded-full bg-muted">
                 <div
-                    className="absolute left-0 top-0 h-1 rounded-full bg-foreground"
+                    className="absolute left-0 top-0 h-1 rounded-full bg-primary" // ⬅ ici
                     style={{ width: `${progressPercent}%` }}
                 />
             </div>

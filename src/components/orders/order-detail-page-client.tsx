@@ -51,7 +51,7 @@ type DbOrderRow = {
     order_items: DbOrderItemRow[] | null;
 };
 
-type UiOrderStatus = "placed" | "shipped" | "delivered";
+type UiOrderStatus = "placed" | "processing" | "shipped" | "delivered";
 
 interface UiOrder {
     id: string;
@@ -79,9 +79,17 @@ interface OrderDetailPageClientProps {
 }
 
 function mapDbStatusToUiStatus(status: string | null): UiOrderStatus {
-    if (status === "shipped") return "shipped";
-    if (status === "delivered") return "delivered";
-    return "placed";
+    switch (status) {
+        case "processing":
+            return "processing";
+        case "shipped":
+            return "shipped";
+        case "delivered":
+            return "delivered";
+        default:
+            // "pending", "cancelled", null, etc.
+            return "placed";
+    }
 }
 
 function mapDbStatusToLabel(status: string | null): string {
