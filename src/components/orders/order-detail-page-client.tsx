@@ -36,12 +36,17 @@ type DbSellerRow = {
     id: string;
     display_name: string | null;
     listings_count: number | null;
+    avatar_url: string | null;
 };
 
 type DbBuyerRow = {
     id: string;
     display_name: string | null;
+    avatar_url: string | null;
 };
+
+type DbSellerRowMaybeArray = DbSellerRow | DbSellerRow[] | null;
+type DbBuyerRowMaybeArray = DbBuyerRow | DbBuyerRow[] | null;
 
 type DbOrderRow = {
     id: string;
@@ -55,8 +60,8 @@ type DbOrderRow = {
     shipping_postcode: string | null;
     shipping_country: string | null;
     estimated_delivery_date: string | null;
-    seller: DbSellerRow | DbSellerRow[] | null;
-    buyer: DbBuyerRow | DbBuyerRow[] | null;
+    seller: DbSellerRowMaybeArray;
+    buyer: DbBuyerRowMaybeArray;
     order_items: DbOrderItemRow[] | null;
 };
 
@@ -79,11 +84,13 @@ interface UiOrder {
         id: string;
         name: string;
         listingsCount: number;
+        avatarUrl?: string | null;
     };
     buyer: {
         id: string;
         name: string;
         completedOrdersCount: number;
+        avatarUrl?: string | null;
     };
     imageUrl?: string | null;
 }
@@ -144,7 +151,7 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
     // 💰 Prix : total de la commande ou snapshot de la première ligne
     const priceCents = order.total_amount ?? firstItem?.price_snapshot ?? 0;
 
-    // 👤 Vendeur & acheteur (on gère objet ou tableau)
+    // 👤 Vendeur & acheteur (objet ou tableau → normalisation)
     const sellerRow = normalizeOne(order.seller);
     const buyerRow = normalizeOne(order.buyer);
 
@@ -188,12 +195,14 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
             id: sellerRow?.id ?? "",
             name: sellerRow?.display_name ?? "Vendeur inconnu",
             listingsCount: sellerRow?.listings_count ?? 0,
+            avatarUrl: sellerRow?.avatar_url ?? null,
         },
         buyer: {
             id: buyerRow?.id ?? "",
             name: buyerRow?.display_name ?? "Acheteur inconnu",
             // valeur de base, raffinée côté client dans OrderBuyerInfo
             completedOrdersCount: 0,
+            avatarUrl: buyerRow?.avatar_url ?? null,
         },
         imageUrl,
     };
@@ -237,11 +246,13 @@ export default function OrderDetailPageClient({
     seller:profiles!orders_seller_id_fkey(
       id,
       display_name,
-      listings_count
+      listings_count,
+      avatar_url
     ),
     buyer:profiles!orders_buyer_id_fkey(
       id,
-      display_name
+      display_name,
+      avatar_url
     ),
     order_items (
       listing_id,
@@ -266,7 +277,7 @@ export default function OrderDetailPageClient({
                 setError("Impossible de charger cette commande.");
                 setOrder(null);
             } else {
-                const uiOrder = mapOrderRowToUi(data);
+                const uiOrder = mapOrderRowToUi(data as DbOrderRow);
                 setOrder(uiOrder);
             }
 
@@ -399,6 +410,7 @@ export default function OrderDetailPageClient({
                                 id={order.seller.id}
                                 name={order.seller.name}
                                 listingsCount={order.seller.listingsCount}
+                                avatarUrl={order.seller.avatarUrl}
                             />
                         )}
 
@@ -407,6 +419,7 @@ export default function OrderDetailPageClient({
                                 id={order.buyer.id}
                                 name={order.buyer.name}
                                 completedOrdersCount={order.buyer.completedOrdersCount}
+                                avatarUrl={order.buyer.avatarUrl}
                             />
                         )}
 
@@ -416,6 +429,7 @@ export default function OrderDetailPageClient({
                                 id={order.seller.id}
                                 name={order.seller.name}
                                 listingsCount={order.seller.listingsCount}
+                                avatarUrl={order.seller.avatarUrl}
                             />
                         )}
                     </div>

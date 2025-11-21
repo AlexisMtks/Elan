@@ -12,6 +12,7 @@ interface OrderBuyerInfoProps {
      * utilisée tant que la requête côté client n’a pas répondu.
      */
     completedOrdersCount: number;
+    avatarUrl?: string | null;
 }
 
 /**
@@ -23,10 +24,10 @@ export function OrderBuyerInfo({
                                    id,
                                    name,
                                    completedOrdersCount,
+                                   avatarUrl,
                                }: OrderBuyerInfoProps) {
-    const [clientOrdersCount, setClientOrdersCount] = useState<number | null>(
-        null,
-    );
+    const [clientOrdersCount, setClientOrdersCount] =
+        useState<number | null>(null);
 
     useEffect(() => {
         // 🛑 Si pas d'id acheteur → aucune requête
@@ -59,6 +60,7 @@ export function OrderBuyerInfo({
             <SellerCard
                 id={id}
                 name={name}
+                avatarUrl={avatarUrl ?? undefined}
                 listingsCount={displayedOrdersCount}
                 showContactButton
                 showProfileButton

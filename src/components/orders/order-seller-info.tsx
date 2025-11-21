@@ -8,6 +8,7 @@ interface OrderSellerInfoProps {
     id: string;
     name: string;
     listingsCount: number; // fallback initial
+    avatarUrl?: string | null;
 }
 
 /**
@@ -15,8 +16,14 @@ interface OrderSellerInfoProps {
  * basé sur la carte vendeur réutilisable (SellerCard).
  * Recalcule en temps réel le nombre d'annonces actives du vendeur.
  */
-export function OrderSellerInfo({ id, name, listingsCount }: OrderSellerInfoProps) {
-    const [activeListingsCount, setActiveListingsCount] = useState<number | null>(null);
+export function OrderSellerInfo({
+                                    id,
+                                    name,
+                                    listingsCount,
+                                    avatarUrl,
+                                }: OrderSellerInfoProps) {
+    const [activeListingsCount, setActiveListingsCount] =
+        useState<number | null>(null);
 
     useEffect(() => {
         // 🛑 Sécurité : si le seller_id est vide → ne pas faire de requête
@@ -50,6 +57,7 @@ export function OrderSellerInfo({ id, name, listingsCount }: OrderSellerInfoProp
             <SellerCard
                 id={id}
                 name={name}
+                avatarUrl={avatarUrl ?? undefined}
                 listingsCount={displayedListingsCount}
                 showContactButton
                 showProfileButton
