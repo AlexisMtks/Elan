@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { SellerCard } from "@/components/listing/seller-card";
+import { RatingStars } from "@/components/rating/rating-stars";
 
 interface OrderSellerInfoProps {
     id: string;
@@ -24,6 +25,7 @@ export function OrderSellerInfo({
                                 }: OrderSellerInfoProps) {
     const [activeListingsCount, setActiveListingsCount] =
         useState<number | null>(null);
+    const [rating, setRating] = useState<number>(0);
 
     useEffect(() => {
         // 🛑 Sécurité : si le seller_id est vide → ne pas faire de requête
@@ -47,7 +49,6 @@ export function OrderSellerInfo({
         void fetchActiveListings();
     }, [id]);
 
-    // Si la requête n'a pas encore répondu, on affiche la valeur fournie par le serveur
     const displayedListingsCount =
         activeListingsCount !== null ? activeListingsCount : listingsCount;
 
@@ -62,6 +63,11 @@ export function OrderSellerInfo({
                 showContactButton
                 showProfileButton
             />
+
+            {/* Juste les étoiles, sans texte */}
+            <div className="pt-1">
+                <RatingStars size="sm" value={rating} onChange={setRating} />
+            </div>
         </div>
     );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { SellerCard } from "@/components/listing/seller-card";
+import { RatingStars } from "@/components/rating/rating-stars";
 
 interface OrderBuyerInfoProps {
     id: string;
@@ -28,6 +29,7 @@ export function OrderBuyerInfo({
                                }: OrderBuyerInfoProps) {
     const [clientOrdersCount, setClientOrdersCount] =
         useState<number | null>(null);
+    const [rating, setRating] = useState<number>(0);
 
     useEffect(() => {
         // 🛑 Si pas d'id acheteur → aucune requête
@@ -65,6 +67,11 @@ export function OrderBuyerInfo({
                 showContactButton
                 showProfileButton
             />
+
+            {/* Juste les étoiles, sans texte */}
+            <div className="pt-1">
+                <RatingStars size="sm" value={rating} onChange={setRating} />
+            </div>
         </div>
     );
 }
