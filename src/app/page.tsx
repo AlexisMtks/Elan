@@ -1,4 +1,5 @@
-import { ProductCard } from "@/components/cards/product-card";
+// src/app/page.tsx
+
 import { PageTitle } from "@/components/misc/page-title";
 import { HomeListingsGrid } from "@/components/listing/home-listings-grid";
 import { supabase } from "@/lib/supabaseClient";
@@ -19,23 +20,23 @@ export default async function HomePage() {
         .from("listings")
         .select(
             `
-              id,
-              title,
-              price,
-              city,
-              status,
-              seller_id,
-              listing_images (
-                image_url,
-                position
-              )
-            `
+        id,
+        title,
+        price,
+        city,
+        status,
+        seller_id,
+        listing_images (
+          image_url,
+          position
+        )
+      `
         )
         .eq("status", "active")
         .order("created_at", { ascending: false })
-        .limit(4)
-        .order("position", { foreignTable: "listing_images", ascending: true }) // on trie les images par position
-        .limit(1, { foreignTable: "listing_images" }); // ✅ on ne charge que la première image par annonce
+        .limit(20) // 🔁 on récupère plus que 4 pour pouvoir compenser les annonces de l'utilisateur
+        .order("position", { foreignTable: "listing_images", ascending: true }) // trie des images
+        .limit(1, { foreignTable: "listing_images" }); // une seule image par annonce
 
     const products: HomeProduct[] = (data ?? []).map((row: any) => {
         const firstImage =
@@ -62,9 +63,7 @@ export default async function HomePage() {
                     title="La plateforme dédiée à la gymnastique"
                     subtitle="Achetez et revendez du matériel de gymnastique artistique en toute confiance."
                 />
-                <div className="flex flex-wrap gap-3">
-                    {/* CTA simulés */}
-                </div>
+                <div className="flex flex-wrap gap-3">{/* CTA simulés */}</div>
             </section>
 
             {/* Produits récents */}

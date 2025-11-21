@@ -87,9 +87,11 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         );
     }
 
+    const visibleProducts = filteredProducts.slice(0, 4);
+
     return (
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-            {filteredProducts.map((p) => (
+            {visibleProducts.map((p) => (
                 <ProductCard
                     key={p.id}
                     id={p.id}
