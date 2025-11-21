@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -9,14 +9,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
-interface LoginFormProps {
-    redirectTo?: string;
-}
-
-export function LoginForm({ redirectTo = "/account" }: LoginFormProps) {
+export function LoginForm() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [redirectTo, setRedirectTo] = useState<string | null>(null);
+
+    // 🔎 On lit redirectTo dans l'URL côté client uniquement
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        try {
+            const url = new URL(window.location.href);
+            const value = url.searchParams.get("redirectTo");
+            if (value) {
+                setRedirectTo(value);
+            }
+        } catch {
+            // on ignore en cas d'URL bizarre
+        }
+    }, []);
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -39,8 +51,8 @@ export function LoginForm({ redirectTo = "/account" }: LoginFormProps) {
         }
 
         if (data?.user) {
-            // ✅ On renvoie l'utilisateur là d'où il vient
-            router.push(redirectTo);
+            const target = redirectTo || "/account";
+            router.push(target);
             return;
         }
 
