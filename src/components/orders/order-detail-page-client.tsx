@@ -411,6 +411,8 @@ export default function OrderDetailPageClient({
                                 name={order.seller.name}
                                 listingsCount={order.seller.listingsCount}
                                 avatarUrl={order.seller.avatarUrl}
+                                orderId={order.id}
+                                reviewerId={user?.id ?? ""}
                             />
                         )}
 
@@ -420,6 +422,8 @@ export default function OrderDetailPageClient({
                                 name={order.buyer.name}
                                 completedOrdersCount={order.buyer.completedOrdersCount}
                                 avatarUrl={order.buyer.avatarUrl}
+                                orderId={order.id}
+                                reviewerId={user?.id ?? ""}
                             />
                         )}
 
@@ -430,6 +434,8 @@ export default function OrderDetailPageClient({
                                 name={order.seller.name}
                                 listingsCount={order.seller.listingsCount}
                                 avatarUrl={order.seller.avatarUrl}
+                                orderId={order.id}
+                                reviewerId={user?.id ?? ""}
                             />
                         )}
                     </div>
