@@ -107,15 +107,22 @@ export function SearchListingsGrid({ listings, hasError }: SearchListingsGridPro
 
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                 {filteredListings.map((p) => (
-                    <ProductCard
+                    <div
                         key={p.id}
-                        id={p.id}
-                        title={p.title}
-                        price={p.price / 100}
-                        location={p.city ?? undefined}
-                        variant="compact"
-                        imageUrl={p.imageUrl}
-                    />
+                        className="
+                transition-transform transition-shadow duration-200
+                hover:-translate-y-1 hover:shadow-lg
+            "
+                    >
+                        <ProductCard
+                            id={p.id}
+                            title={p.title}
+                            price={p.price / 100}
+                            location={p.city ?? undefined}
+                            variant="compact"
+                            imageUrl={p.imageUrl}
+                        />
+                    </div>
                 ))}
             </div>
         </div>
