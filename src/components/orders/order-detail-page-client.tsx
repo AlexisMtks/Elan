@@ -22,12 +22,14 @@ type DbListingRow = {
     listing_images?: DbListingImageRow[] | null;
 };
 
+type DbListingRowMaybeArray = DbListingRow | DbListingRow[] | null;
+
 type DbOrderItemRow = {
     listing_id: string | null;
     title_snapshot: string | null;
     price_snapshot: number | null;
     quantity: number | null;
-    listing?: DbListingRow | null;
+    listing?: DbListingRowMaybeArray;
 };
 
 type DbSellerRow = {
@@ -159,7 +161,8 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
 
     // 🖼 Image principale
     let imageUrl: string | null = null;
-    const listingImages = firstItem?.listing?.listing_images;
+    const normalizedListing = normalizeOne(firstItem?.listing ?? null);
+    const listingImages = normalizedListing?.listing_images ?? null;
 
     if (Array.isArray(listingImages) && listingImages.length > 0) {
         const sorted = [...listingImages].sort(
@@ -263,7 +266,7 @@ export default function OrderDetailPageClient({
                 setError("Impossible de charger cette commande.");
                 setOrder(null);
             } else {
-                const uiOrder = mapOrderRowToUi(data as DbOrderRow);
+                const uiOrder = mapOrderRowToUi(data);
                 setOrder(uiOrder);
             }
 
