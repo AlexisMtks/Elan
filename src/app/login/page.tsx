@@ -6,13 +6,15 @@ import { useRedirectIfAuth } from "@/hooks/use-redirect-if-auth";
 import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
-    // On récupère le paramètre redirectTo si présent
     const searchParams = useSearchParams();
-    const redirectTo = searchParams.get("redirectTo") || "/";
 
-    // On passe redirectTo au hook
-    // Pour que si l'utilisateur est déjà connecté, il soit renvoyé sur cette page
-    const { checking } = useRedirectIfAuth(redirectTo);
+    // Peut venir de /login?redirectTo=/quelque-chose
+    const redirectToParam = searchParams.get("redirectTo");
+    // undefined → le hook utilisera sa valeur par défaut (probablement /account)
+    const redirectTo = redirectToParam ?? undefined;
+
+    // ✅ On passe un objet, pas une string
+    const { checking } = useRedirectIfAuth({ redirectTo });
 
     if (checking) {
         return (
@@ -29,7 +31,7 @@ export default function LoginPage() {
                 subtitle="Accédez à votre compte Élan pour gérer vos annonces, vos ventes et vos achats."
             />
 
-            {/* 🔥 On transmet redirectTo au formulaire */}
+            {/* Le formulaire saura où renvoyer après login */}
             <LoginForm redirectTo={redirectTo} />
         </div>
     );
