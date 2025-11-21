@@ -11,10 +11,22 @@ import { OrderSellerInfo } from "@/components/orders/order-seller-info";
 import { DetailRow } from "@/components/misc/detail-row";
 import { Card } from "@/components/ui/card";
 
+type DbListingImageRow = {
+    image_url: string;
+    position: number | null;
+};
+
+type DbListingRow = {
+    id: string;
+    listing_images?: DbListingImageRow[] | null;
+};
+
 type DbOrderItemRow = {
+    listing_id: string | null;
     title_snapshot: string | null;
     price_snapshot: number | null;
     quantity: number | null;
+    listing?: DbListingRow | null;
 };
 
 type DbSellerRow = {
@@ -59,6 +71,7 @@ interface UiOrder {
         name: string;
         listingsCount: number;
     };
+    imageUrl?: string | null;
 }
 
 interface OrderDetailPageClientProps {
@@ -101,11 +114,14 @@ function formatDateFr(value: string | null): string {
 function mapOrderRowToUi(order: DbOrderRow): UiOrder {
     const firstItem = order.order_items?.[0] ?? null;
 
+    // 💰 Prix : total de la commande ou snapshot de la première ligne
     const priceCents =
         order.total_amount ?? firstItem?.price_snapshot ?? 0;
 
+    // 👤 Vendeur
     const sellerRow = order.seller?.[0] ?? null;
 
+    // 📦 Adresse
     const addressLine1 =
         order.shipping_address_line1 ?? "Adresse de livraison non renseignée";
 
@@ -116,7 +132,18 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
     const addressLine2 =
         addressParts.join(" ") || order.shipping_address_line2 || "";
 
-    return {
+    // 🖼 Image principale
+    let imageUrl: string | null = null;
+    const listingImages = firstItem?.listing?.listing_images;
+
+    if (Array.isArray(listingImages) && listingImages.length > 0) {
+        const sorted = [...listingImages].sort(
+            (a, b) => (a.position ?? 0) - (b.position ?? 0),
+        );
+        imageUrl = sorted[0]?.image_url ?? null;
+    }
+
+    const uiOrder: UiOrder = {
         id: order.id,
         productTitle:
             firstItem?.title_snapshot ?? `Commande #${order.id}`,
@@ -134,7 +161,10 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
             name: sellerRow?.display_name ?? "Vendeur inconnu",
             listingsCount: sellerRow?.listings_count ?? 0,
         },
+        imageUrl,
     };
+
+    return uiOrder;
 }
 
 export default function OrderDetailPageClient({
@@ -159,28 +189,36 @@ export default function OrderDetailPageClient({
                 .from("orders")
                 .select(
                     `
-          id,
-          created_at,
-          status,
-          total_amount,
-          shipping_method,
-          shipping_address_line1,
-          shipping_address_line2,
-          shipping_city,
-          shipping_postcode,
-          shipping_country,
-          estimated_delivery_date,
-          seller:profiles!orders_seller_id_fkey(
-            id,
-            display_name,
-            listings_count
-          ),
-          order_items (
-            title_snapshot,
-            price_snapshot,
-            quantity
-          )
-        `
+    id,
+    created_at,
+    status,
+    total_amount,
+    shipping_method,
+    shipping_address_line1,
+    shipping_address_line2,
+    shipping_city,
+    shipping_postcode,
+    shipping_country,
+    estimated_delivery_date,
+    seller:profiles!orders_seller_id_fkey(
+      id,
+      display_name,
+      listings_count
+    ),
+    order_items (
+      listing_id,
+      title_snapshot,
+      price_snapshot,
+      quantity,
+      listing:listings!order_items_listing_id_fkey (
+        id,
+        listing_images (
+          image_url,
+          position
+        )
+      )
+    )
+  `,
                 )
                 .eq("id", orderId)
                 .maybeSingle();
@@ -190,7 +228,8 @@ export default function OrderDetailPageClient({
                 setError("Impossible de charger cette commande.");
                 setOrder(null);
             } else {
-                setOrder(mapOrderRowToUi(data as DbOrderRow));
+                const uiOrder = mapOrderRowToUi(data as DbOrderRow);
+                setOrder(uiOrder);
             }
 
             setLoading(false);
@@ -231,16 +270,26 @@ export default function OrderDetailPageClient({
             {/* Résumé haut : image + titre + prix + statut */}
             <section className="space-y-6 rounded-2xl border p-6">
                 <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.2fr)_minmax(0,0.9fr)]">
-                    {/* Placeholder visuel du produit */}
-                    <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-muted">
-            <span className="text-xs text-muted-foreground">
-              Image du produit
-            </span>
+                    {/* Visuel du produit */}
+                    <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-muted overflow-hidden">
+                        {order.imageUrl ? (
+                            <img
+                                src={order.imageUrl}
+                                alt={order.productTitle}
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            <span className="text-xs text-muted-foreground">
+                Image du produit
+              </span>
+                        )}
                     </div>
 
                     {/* Titre + prix */}
                     <div className="space-y-2 self-center">
-                        <h1 className="text-2xl font-semibold">{order.productTitle}</h1>
+                        <h1 className="text-2xl font-semibold">
+                            {order.productTitle}
+                        </h1>
                         {order.originalPrice &&
                             order.originalPrice !== order.price && (
                                 <p className="text-sm text-muted-foreground line-through">
