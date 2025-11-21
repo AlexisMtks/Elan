@@ -10,10 +10,9 @@ export default function LoginPage() {
 
     // Peut venir de /login?redirectTo=/quelque-chose
     const redirectToParam = searchParams.get("redirectTo");
-    // undefined → le hook utilisera sa valeur par défaut (probablement /account)
     const redirectTo = redirectToParam ?? undefined;
 
-    // ✅ On passe un objet, pas une string
+    // Le hook attend un objet
     const { checking } = useRedirectIfAuth({ redirectTo });
 
     if (checking) {
@@ -31,7 +30,6 @@ export default function LoginPage() {
                 subtitle="Accédez à votre compte Élan pour gérer vos annonces, vos ventes et vos achats."
             />
 
-            {/* Le formulaire saura où renvoyer après login */}
             <LoginForm redirectTo={redirectTo} />
         </div>
     );
