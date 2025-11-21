@@ -26,7 +26,7 @@ export function SearchListingsGrid({ listings, hasError }: SearchListingsGridPro
     useEffect(() => {
         let cancelled = false;
 
-        async function loadUser() {
+        async function loadInitialUser() {
             try {
                 const { data, error } = await supabase.auth.getUser();
 
@@ -44,19 +44,31 @@ export function SearchListingsGrid({ listings, hasError }: SearchListingsGridPro
             }
         }
 
-        loadUser();
+        void loadInitialUser();
+
+        // 🔁 Écoute live des changements d'auth (login / logout)
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (cancelled) return;
+
+            if (session?.user) {
+                setUserId(session.user.id);
+            } else {
+                setUserId(null);
+            }
+        });
 
         return () => {
             cancelled = true;
+            subscription.unsubscribe();
         };
     }, []);
 
     if (hasError) {
-        // le message d'erreur est géré par la page
         return null;
     }
 
-    // Aucun résultat en base (indépendamment de l'utilisateur)
     if (listings.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
@@ -76,12 +88,10 @@ export function SearchListingsGrid({ listings, hasError }: SearchListingsGridPro
     const filteredListings =
         userId === null ? listings : listings.filter((l) => l.sellerId !== userId);
 
-    // Toutes les annonces trouvées appartiennent à l'utilisateur connecté
     if (filteredListings.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
-                Aucun résultat ne correspond à votre recherche (vos propres annonces
-                actives sont masquées).
+                Aucun résultat ne correspond à votre recherche (vos propres annonces actives sont masquées).
             </p>
         );
     }

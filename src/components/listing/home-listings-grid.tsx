@@ -27,7 +27,7 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
     useEffect(() => {
         let cancelled = false;
 
-        async function loadUser() {
+        async function loadInitialUser() {
             try {
                 const { data, error } = await supabase.auth.getUser();
 
@@ -45,17 +45,33 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
             }
         }
 
-        loadUser();
+        void loadInitialUser();
+
+        // ✅ écoute des changements de session (login / logout)
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (cancelled) return;
+
+            if (session?.user) {
+                setUserId(session.user.id);
+            } else {
+                setUserId(null);
+            }
+        });
 
         return () => {
             cancelled = true;
+            subscription.unsubscribe();
         };
     }, []);
 
+    // Le message d'erreur est déjà géré par le parent
     if (hasError) {
         return null;
     }
 
+    // Cas : aucune annonce en base
     if (products.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
@@ -64,6 +80,7 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         );
     }
 
+    // Pendant qu'on vérifie la session → petit message de chargement
     if (checking) {
         return (
             <p className="text-sm text-muted-foreground">
@@ -75,6 +92,7 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
     const filteredProducts =
         userId === null ? products : products.filter((p) => p.sellerId !== userId);
 
+    // Cas : il y avait des annonces, mais elles sont toutes à l'utilisateur connecté
     if (filteredProducts.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
