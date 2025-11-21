@@ -34,12 +34,12 @@ type DbSellerRow = {
     id: string;
     display_name: string | null;
     listings_count: number | null;
-} | null;
+};
 
 type DbBuyerRow = {
     id: string;
     display_name: string | null;
-} | null;
+};
 
 type DbOrderRow = {
     id: string;
@@ -53,8 +53,8 @@ type DbOrderRow = {
     shipping_postcode: string | null;
     shipping_country: string | null;
     estimated_delivery_date: string | null;
-    seller: DbSellerRow;
-    buyer: DbBuyerRow;
+    seller: DbSellerRow | DbSellerRow[] | null;
+    buyer: DbBuyerRow | DbBuyerRow[] | null;
     order_items: DbOrderItemRow[] | null;
 };
 
@@ -131,15 +131,20 @@ function formatDateFr(value: string | null): string {
     });
 }
 
+function normalizeOne<T>(value: T | T[] | null): T | null {
+    if (!value) return null;
+    return Array.isArray(value) ? value[0] ?? null : value;
+}
+
 function mapOrderRowToUi(order: DbOrderRow): UiOrder {
     const firstItem = order.order_items?.[0] ?? null;
 
     // 💰 Prix : total de la commande ou snapshot de la première ligne
     const priceCents = order.total_amount ?? firstItem?.price_snapshot ?? 0;
 
-    // 👤 Vendeur & acheteur
-    const sellerRow = order.seller ?? null;
-    const buyerRow = order.buyer ?? null;
+    // 👤 Vendeur & acheteur (on gère objet ou tableau)
+    const sellerRow = normalizeOne(order.seller);
+    const buyerRow = normalizeOne(order.buyer);
 
     // 📦 Adresse
     const addressLine1 =
@@ -402,7 +407,7 @@ export default function OrderDetailPageClient({
                             />
                         )}
 
-                        {/* Fallback (cas étrange : ni buyer ni seller) */}
+                        {/* Fallback (ni buyer ni seller : cas anormal, on montre le vendeur) */}
                         {!isBuyerView && !isSellerView && (
                             <OrderSellerInfo
                                 id={order.seller.id}
