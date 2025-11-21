@@ -7,6 +7,7 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 
 import { OrderStatusBar } from "@/components/orders/order-status-bar";
 import { OrderSellerInfo } from "@/components/orders/order-seller-info";
+import { OrderBuyerInfo } from "@/components/orders/order-buyer-info";
 // import { OrderTimeline } from "@/components/orders/order-timeline";
 import { DetailRow } from "@/components/misc/detail-row";
 import { Card } from "@/components/ui/card";
@@ -35,6 +36,11 @@ type DbSellerRow = {
     listings_count: number | null;
 } | null;
 
+type DbBuyerRow = {
+    id: string;
+    display_name: string | null;
+} | null;
+
 type DbOrderRow = {
     id: string;
     created_at: string;
@@ -47,7 +53,8 @@ type DbOrderRow = {
     shipping_postcode: string | null;
     shipping_country: string | null;
     estimated_delivery_date: string | null;
-    seller: DbSellerRow; // 👈 objet, plus un tableau
+    seller: DbSellerRow;
+    buyer: DbBuyerRow;
     order_items: DbOrderItemRow[] | null;
 };
 
@@ -70,6 +77,11 @@ interface UiOrder {
         id: string;
         name: string;
         listingsCount: number;
+    };
+    buyer: {
+        id: string;
+        name: string;
+        completedOrdersCount: number;
     };
     imageUrl?: string | null;
 }
@@ -125,8 +137,9 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
     // 💰 Prix : total de la commande ou snapshot de la première ligne
     const priceCents = order.total_amount ?? firstItem?.price_snapshot ?? 0;
 
-    // 👤 Vendeur (objet direct, plus de tableau)
+    // 👤 Vendeur & acheteur
     const sellerRow = order.seller ?? null;
+    const buyerRow = order.buyer ?? null;
 
     // 📦 Adresse
     const addressLine1 =
@@ -167,6 +180,12 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
             id: sellerRow?.id ?? "",
             name: sellerRow?.display_name ?? "Vendeur inconnu",
             listingsCount: sellerRow?.listings_count ?? 0,
+        },
+        buyer: {
+            id: buyerRow?.id ?? "",
+            name: buyerRow?.display_name ?? "Acheteur inconnu",
+            // valeur de base, raffinée côté client dans OrderBuyerInfo
+            completedOrdersCount: 0,
         },
         imageUrl,
     };
@@ -211,6 +230,10 @@ export default function OrderDetailPageClient({
       id,
       display_name,
       listings_count
+    ),
+    buyer:profiles!orders_buyer_id_fkey(
+      id,
+      display_name
     ),
     order_items (
       listing_id,
@@ -272,6 +295,9 @@ export default function OrderDetailPageClient({
         );
     }
 
+    const isBuyerView = user?.id === order.buyer.id;
+    const isSellerView = user?.id === order.seller.id;
+
     return (
         <div className="space-y-10">
             {/* Résumé haut : image + titre + prix + statut */}
@@ -316,7 +342,7 @@ export default function OrderDetailPageClient({
                 </div>
             </section>
 
-            {/* Informations de commande + vendeur */}
+            {/* Informations de commande + profil (vendeur/acheteur) */}
             <section>
                 <Card className="rounded-2xl border p-6">
                     <div className="grid gap-8 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -359,11 +385,31 @@ export default function OrderDetailPageClient({
                             />
                         </dl>
 
-                        <OrderSellerInfo
-                            id={order.seller.id}
-                            name={order.seller.name}
-                            listingsCount={order.seller.listingsCount}
-                        />
+                        {/* Côté acheteur → on montre le vendeur, côté vendeur → on montre l'acheteur */}
+                        {isBuyerView && (
+                            <OrderSellerInfo
+                                id={order.seller.id}
+                                name={order.seller.name}
+                                listingsCount={order.seller.listingsCount}
+                            />
+                        )}
+
+                        {isSellerView && (
+                            <OrderBuyerInfo
+                                id={order.buyer.id}
+                                name={order.buyer.name}
+                                completedOrdersCount={order.buyer.completedOrdersCount}
+                            />
+                        )}
+
+                        {/* Fallback (cas étrange : ni buyer ni seller) */}
+                        {!isBuyerView && !isSellerView && (
+                            <OrderSellerInfo
+                                id={order.seller.id}
+                                name={order.seller.name}
+                                listingsCount={order.seller.listingsCount}
+                            />
+                        )}
                     </div>
                 </Card>
             </section>
