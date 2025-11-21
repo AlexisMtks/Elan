@@ -15,10 +15,7 @@ interface OrderSellerInfoProps {
 }
 
 /**
- * Bloc d'informations sur le vendeur pour le détail de commande,
- * basé sur la carte vendeur réutilisable (SellerCard).
- * - Recalcule le nombre d'annonces actives du vendeur
- * - Permet de noter le vendeur (insert dans reviews)
+ * Bloc d'infos du vendeur + note liée à la commande.
  */
 export function OrderSellerInfo({
                                     id,
@@ -31,9 +28,10 @@ export function OrderSellerInfo({
     const [activeListingsCount, setActiveListingsCount] =
         useState<number | null>(null);
     const [rating, setRating] = useState<number>(0);
+    const [reviewId, setReviewId] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
-    // 🔢 Recalcul du nombre d'annonces actives
+    // 🔢 Nombre d'annonces actives
     useEffect(() => {
         if (!id) {
             setActiveListingsCount(null);
@@ -55,14 +53,14 @@ export function OrderSellerInfo({
         void fetchActiveListings();
     }, [id]);
 
-    // ⭐ Pré-charger une éventuelle review existante
+    // ⭐ Charger une éventuelle review existante pour (reviewer, vendeur, commande)
     useEffect(() => {
         if (!reviewerId || !id || !orderId) return;
 
         const fetchExistingReview = async () => {
             const { data, error } = await supabase
                 .from("reviews")
-                .select("rating")
+                .select("id, rating")
                 .eq("reviewer_id", reviewerId)
                 .eq("reviewed_id", id)
                 .eq("order_id", orderId)
@@ -70,8 +68,9 @@ export function OrderSellerInfo({
                 .limit(1)
                 .maybeSingle();
 
-            if (!error && data?.rating) {
-                setRating(data.rating);
+            if (!error && data) {
+                setRating(data.rating ?? 0);
+                setReviewId(data.id);
             }
         };
 
@@ -84,27 +83,49 @@ export function OrderSellerInfo({
     const handleRatingChange = async (newRating: number) => {
         setRating(newRating);
 
-        // Si on n'a pas les infos essentielles, on s'arrête au front
         if (!reviewerId || !id || !orderId) return;
 
         setSubmitting(true);
 
-        const { error } = await supabase.from("reviews").insert({
-            reviewer_id: reviewerId,
-            reviewed_id: id,
-            order_id: orderId,
-            rating: newRating,
-            comment: null,
-            reviewer_avatar_url: avatarUrl ?? null,
-        });
+        try {
+            if (reviewId) {
+                // 🔁 Review déjà existante → UPDATE
+                const { error } = await supabase
+                    .from("reviews")
+                    .update({
+                        rating: newRating,
+                        reviewer_avatar_url: avatarUrl ?? null,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", reviewId);
 
-        if (error) {
-            console.error("Erreur enregistrement avis vendeur :", error);
-            // En cas d’erreur, tu peux décider de revert la note si tu veux
-            // setRating(0);
+                if (error) {
+                    console.error("Erreur update avis vendeur :", error);
+                }
+            } else {
+                // 🆕 Pas encore de review → INSERT
+                const { data, error } = await supabase
+                    .from("reviews")
+                    .insert({
+                        reviewer_id: reviewerId,
+                        reviewed_id: id,
+                        order_id: orderId,
+                        rating: newRating,
+                        comment: null,
+                        reviewer_avatar_url: avatarUrl ?? null,
+                    })
+                    .select("id")
+                    .single();
+
+                if (error) {
+                    console.error("Erreur insert avis vendeur :", error);
+                } else if (data?.id) {
+                    setReviewId(data.id);
+                }
+            }
+        } finally {
+            setSubmitting(false);
         }
-
-        setSubmitting(false);
     };
 
     return (
@@ -119,7 +140,6 @@ export function OrderSellerInfo({
                 showProfileButton
             />
 
-            {/* Juste les étoiles, cliquables */}
             <div className="pt-1">
                 <RatingStars
                     size="sm"

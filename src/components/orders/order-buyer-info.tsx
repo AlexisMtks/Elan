@@ -15,9 +15,7 @@ interface OrderBuyerInfoProps {
 }
 
 /**
- * Bloc d'informations sur l'acheteur pour le détail de commande.
- * - Affiche la “fiche” de l’acheteur
- * - Permet de le noter sur la commande
+ * Bloc d'informations sur l'acheteur + note liée à la commande.
  */
 export function OrderBuyerInfo({
                                    id,
@@ -30,9 +28,10 @@ export function OrderBuyerInfo({
     const [clientOrdersCount, setClientOrdersCount] =
         useState<number | null>(null);
     const [rating, setRating] = useState<number>(0);
+    const [reviewId, setReviewId] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
-    // 🔢 Nombre de commandes (hors annulées)
+    // 🔢 Nombre de commandes de l'acheteur
     useEffect(() => {
         if (!id) {
             setClientOrdersCount(null);
@@ -54,14 +53,14 @@ export function OrderBuyerInfo({
         void fetchBuyerOrdersCount();
     }, [id]);
 
-    // ⭐ Pré-charger une éventuelle review existante
+    // ⭐ Charger la review éventuelle pour (reviewer, acheteur, commande)
     useEffect(() => {
         if (!reviewerId || !id || !orderId) return;
 
         const fetchExistingReview = async () => {
             const { data, error } = await supabase
                 .from("reviews")
-                .select("rating")
+                .select("id, rating")
                 .eq("reviewer_id", reviewerId)
                 .eq("reviewed_id", id)
                 .eq("order_id", orderId)
@@ -69,8 +68,9 @@ export function OrderBuyerInfo({
                 .limit(1)
                 .maybeSingle();
 
-            if (!error && data?.rating) {
-                setRating(data.rating);
+            if (!error && data) {
+                setRating(data.rating ?? 0);
+                setReviewId(data.id);
             }
         };
 
@@ -87,21 +87,45 @@ export function OrderBuyerInfo({
 
         setSubmitting(true);
 
-        const { error } = await supabase.from("reviews").insert({
-            reviewer_id: reviewerId,
-            reviewed_id: id,
-            order_id: orderId,
-            rating: newRating,
-            comment: null,
-            reviewer_avatar_url: avatarUrl ?? null,
-        });
+        try {
+            if (reviewId) {
+                // 🔁 Review déjà existante → UPDATE
+                const { error } = await supabase
+                    .from("reviews")
+                    .update({
+                        rating: newRating,
+                        reviewer_avatar_url: avatarUrl ?? null,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", reviewId);
 
-        if (error) {
-            console.error("Erreur enregistrement avis acheteur :", error);
-            // éventuellement : setRating(0);
+                if (error) {
+                    console.error("Erreur update avis acheteur :", error);
+                }
+            } else {
+                // 🆕 Pas encore de review → INSERT
+                const { data, error } = await supabase
+                    .from("reviews")
+                    .insert({
+                        reviewer_id: reviewerId,
+                        reviewed_id: id,
+                        order_id: orderId,
+                        rating: newRating,
+                        comment: null,
+                        reviewer_avatar_url: avatarUrl ?? null,
+                    })
+                    .select("id")
+                    .single();
+
+                if (error) {
+                    console.error("Erreur insert avis acheteur :", error);
+                } else if (data?.id) {
+                    setReviewId(data.id);
+                }
+            }
+        } finally {
+            setSubmitting(false);
         }
-
-        setSubmitting(false);
     };
 
     return (
