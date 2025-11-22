@@ -64,24 +64,16 @@ export function MyListingCard({
             price={price}
             location={location}
             variant="default"
-            clickable={false} // désactive la navigation sur cette variante
+            // clickable: par défaut = true → même comportement que la home
             imageUrl={imageUrl}
             footer={
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <Badge variant={statusVariant as any}>{statusLabel}</Badge>
                     <div className="flex gap-2">
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleEdit}
-                        >
+                        <Button size="sm" variant="outline" onClick={handleEdit}>
                             Modifier
                         </Button>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleDelete}
-                        >
+                        <Button size="sm" variant="outline" onClick={handleDelete}>
                             Supprimer
                         </Button>
                     </div>
