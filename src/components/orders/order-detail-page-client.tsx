@@ -181,8 +181,7 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
 
     const uiOrder: UiOrder = {
         id: order.id,
-        productTitle:
-            firstItem?.title_snapshot ?? `Commande #${order.id}`,
+        productTitle: firstItem?.title_snapshot ?? `Commande #${order.id}`,
         price: priceCents / 100,
         statusLabel: mapDbStatusToLabel(order.status),
         currentStatus: mapDbStatusToUiStatus(order.status),
@@ -211,7 +210,9 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
     return uiOrder;
 }
 
-export default function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
+export default function OrderDetailPageClient({
+                                                  orderId,
+                                              }: OrderDetailPageClientProps) {
     const { user, checking } = useRequireAuth();
     const router = useRouter();
 
@@ -242,7 +243,8 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
 
             const { data, error } = await supabase
                 .from("orders")
-                .select(`
+                .select(
+                    `
           id,
           created_at,
           status,
@@ -278,7 +280,8 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
               )
             )
           )
-        `)
+        `,
+                )
                 .eq("id", orderId)
                 .maybeSingle();
 
@@ -351,7 +354,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
         void fetchExistingReview();
     }, [user, order]);
 
-    // 3️⃣ Ensuite seulement, les returns conditionnels
+    // 4️⃣ Returns conditionnels
     if (checking || loading) {
         return (
             <div className="flex min-h-[200px] items-center justify-center">
@@ -379,11 +382,11 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
         );
     }
 
+    const isBuyerView = !!(user && order && user.id === order.buyer.id);
+    const isSellerView = !!(user && order && user.id === order.seller.id);
+
     // ---------- Vendeur → Acheteur ----------
-    const upsertBuyerReview = async (
-        newRating: number,
-        newComment: string,
-    ) => {
+    const upsertBuyerReview = async (newRating: number, newComment: string) => {
         if (!user || !order || !isSellerView) return;
         if (newRating < 1 || newRating > 5) return;
 
@@ -408,8 +411,8 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                 const { data, error } = await supabase
                     .from("reviews")
                     .insert({
-                        reviewer_id: user.id,          // vendeur
-                        reviewed_id: order.buyer.id,   // acheteur
+                        reviewer_id: user.id, // vendeur
+                        reviewed_id: order.buyer.id, // acheteur
                         order_id: order.id,
                         rating: newRating,
                         comment: newComment,
@@ -429,9 +432,9 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
         }
     };
 
-    const handleBuyerRatingChange = async (newRating: number) => {
+    const handleBuyerRatingChange = (newRating: number) => {
         setBuyerRating(newRating);
-        await upsertBuyerReview(newRating, buyerComment);
+        void upsertBuyerReview(newRating, buyerComment);
     };
 
     const handleBuyerSaveComment = async () => {
@@ -442,10 +445,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
     const buyerCommentId = `order-${order.id}-buyer-comment`;
 
     // ---------- Acheteur → Vendeur ----------
-    const upsertSellerReview = async (
-        newRating: number,
-        newComment: string,
-    ) => {
+    const upsertSellerReview = async (newRating: number, newComment: string) => {
         if (!user || !order || !isBuyerView) return;
         if (newRating < 1 || newRating > 5) return;
 
@@ -470,8 +470,8 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                 const { data, error } = await supabase
                     .from("reviews")
                     .insert({
-                        reviewer_id: user.id,          // acheteur
-                        reviewed_id: order.seller.id,  // vendeur
+                        reviewer_id: user.id, // acheteur
+                        reviewed_id: order.seller.id, // vendeur
                         order_id: order.id,
                         rating: newRating,
                         comment: newComment,
@@ -491,9 +491,9 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
         }
     };
 
-    const handleSellerRatingChange = async (newRating: number) => {
+    const handleSellerRatingChange = (newRating: number) => {
         setSellerRating(newRating);
-        await upsertSellerReview(newRating, sellerComment);
+        void upsertSellerReview(newRating, sellerComment);
     };
 
     const handleSellerSaveComment = async () => {
@@ -503,78 +503,13 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
 
     const sellerCommentId = `order-${order.id}-seller-comment`;
 
-    const isBuyerView = !!(user && order && user.id === order.buyer.id);
-    const isSellerView = !!(user && order && user.id === order.seller.id);
-
-    const upsertReview = async (newRating: number, newComment: string) => {
-        if (!user || !order || !isSellerView) return;
-        if (newRating < 1 || newRating > 5) return;
-
-        setSubmitting(true);
-
-        try {
-            if (reviewId) {
-                // 🔁 UPDATE
-                const { error } = await supabase
-                    .from("reviews")
-                    .update({
-                        rating: newRating,
-                        comment: newComment,
-                        reviewer_avatar_url: order.seller.avatarUrl ?? null,
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq("id", reviewId);
-
-                if (error) {
-                    console.error("Erreur update avis acheteur :", error);
-                }
-            } else {
-                // 🆕 INSERT
-                const { data, error } = await supabase
-                    .from("reviews")
-                    .insert({
-                        reviewer_id: user.id,
-                        reviewed_id: order.buyer.id,
-                        order_id: order.id,
-                        rating: newRating,
-                        comment: newComment,
-                        reviewer_avatar_url: order.seller.avatarUrl ?? null,
-                    })
-                    .select("id")
-                    .single();
-
-                if (error) {
-                    console.error("Erreur insert avis acheteur :", error);
-                } else if (data?.id) {
-                    setReviewId(data.id);
-                }
-            }
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleRatingChange = async (newRating: number) => {
-        setRating(newRating);
-        await upsertReview(newRating, comment);
-    };
-
-    const handleSaveComment = async () => {
-        if (!rating) return; // on impose une note avant de sauver un commentaire
-        await upsertReview(rating, comment);
-    };
-
-    const commentId = order
-        ? `order-${order.id}-buyer-comment`
-        : "order-comment-placeholder";
-
     return (
         <div className="space-y-10">
             {/* Résumé haut : image + titre + prix + statut */}
             <section className="space-y-6 rounded-2xl border p-6">
                 <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.2fr)_minmax(0,0.9fr)]">
                     {/* Visuel du produit */}
-                    <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-muted overflow-hidden">
+                    <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-muted">
                         {order.imageUrl ? (
                             <img
                                 src={order.imageUrl}
@@ -590,15 +525,12 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
 
                     {/* Titre + prix */}
                     <div className="space-y-2 self-center">
-                        <h1 className="text-2xl font-semibold">
-                            {order.productTitle}
-                        </h1>
-                        {order.originalPrice &&
-                            order.originalPrice !== order.price && (
-                                <p className="text-sm text-muted-foreground line-through">
-                                    {order.originalPrice} €
-                                </p>
-                            )}
+                        <h1 className="text-2xl font-semibold">{order.productTitle}</h1>
+                        {order.originalPrice && order.originalPrice !== order.price && (
+                            <p className="text-sm text-muted-foreground line-through">
+                                {order.originalPrice} €
+                            </p>
+                        )}
                         <p className="text-2xl font-semibold">{order.price} €</p>
                     </div>
 
@@ -681,7 +613,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                             />
                         )}
 
-                        {/* Fallback (ni buyer ni seller : cas anormal, on montre le vendeur sans interaction) */}
+                        {/* Fallback (ni buyer ni seller : cas anormal, on montre le vendeur readonly) */}
                         {!isBuyerView && !isSellerView && (
                             <OrderSellerInfo
                                 id={order.seller.id}
@@ -702,7 +634,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                                 htmlFor={buyerCommentId}
                                 className="text-xs font-medium text-muted-foreground"
                             >
-                                Commentaire sur l'acheteur (optionnel)
+                                Commentaire sur l&apos;acheteur (optionnel)
                             </label>
 
                             <Textarea
