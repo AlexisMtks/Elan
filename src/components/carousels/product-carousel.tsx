@@ -6,6 +6,8 @@ interface ProductCarouselItem {
     price: number;
     location?: string;
     subtitle?: string;
+    imageUrl?: string;   // ✅ première image de l’annonce
+    clickable?: boolean; // ✅ permet de désactiver le clic (profil public de l’auteur)
 }
 
 interface ProductCarouselProps {
@@ -29,6 +31,8 @@ export function ProductCarousel({ title, items }: ProductCarouselProps) {
                             price={item.price}
                             location={item.location}
                             subtitle={item.subtitle}
+                            imageUrl={item.imageUrl}
+                            clickable={item.clickable ?? true} // ✅ on respecte clickable
                             variant="compact"
                         />
                     </div>

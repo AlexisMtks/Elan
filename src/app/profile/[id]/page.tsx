@@ -26,6 +26,10 @@ type ListingRow = {
     city: string | null;
     status: string;
     seller_id: string;
+    listing_images?: {
+        image_url: string;
+        position: number;
+    }[] | null;
 };
 
 type ReviewRow = {
@@ -56,22 +60,39 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             .single(),
         supabase
             .from("listings")
-            .select("id, title, price, city, status, seller_id")
+            .select(
+                    `
+                    id,
+                    title,
+                    price,
+                    city,
+                    status,
+                    seller_id,
+                    listing_images (
+                      image_url,
+                      position
+                    )
+                  `,
+            )
             .eq("seller_id", id)
             .eq("status", "active")
-            .order("created_at", { ascending: false }),
+            .order("created_at", { ascending: false })
+            .order("position", { foreignTable: "listing_images", ascending: true })
+            .limit(1, { foreignTable: "listing_images" }),
+
         supabase
             .from("reviews")
             .select(`
-                id,
-                rating,
-                comment,
-                reviewer:profiles!reviews_reviewer_id_fkey(
                     id,
-                    display_name,
-                    avatar_url
-                )
-            `)
+                    rating,
+                    comment,
+                    reviewer:profiles!reviews_reviewer_id_fkey(
+                        id,
+                        display_name,
+                        avatar_url
+                    )
+                    `
+            )
             .eq("reviewed_id", id)
             .order("created_at", { ascending: false }),
     ]);
@@ -127,12 +148,20 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         avatarUrl: p.avatar_url ?? null,
     };
 
-    const carouselItems = listings.map((l) => ({
-        id: l.id.toString(),
-        title: l.title,
-        price: l.price / 100,
-        location: l.city ?? undefined,
-    }));
+    const carouselItems = listings.map((l) => {
+        const firstImage =
+            Array.isArray(l.listing_images) && l.listing_images.length > 0
+                ? l.listing_images[0].image_url
+                : undefined;
+
+        return {
+            id: l.id.toString(),
+            title: l.title,
+            price: l.price / 100,
+            location: l.city ?? undefined,
+            imageUrl: firstImage, // ✅ envoyé au ProductCarousel
+        };
+    });
 
     const reviewItems = reviews.map((r) => {
         const reviewer = r.reviewer;
