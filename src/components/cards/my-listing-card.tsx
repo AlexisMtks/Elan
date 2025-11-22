@@ -66,6 +66,7 @@ export function MyListingCard({
             variant="default"
             // clickable: par défaut = true → même comportement que la home
             imageUrl={imageUrl}
+            showActions={false}
             footer={
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <Badge variant={statusVariant as any}>{statusLabel}</Badge>

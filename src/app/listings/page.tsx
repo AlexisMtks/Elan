@@ -14,17 +14,19 @@ import { BackToAccountButton } from "@/components/navigation/back-to-account-but
 
 type UiListingStatus = "active" | "draft" | "ended";
 
+type DbListingStatus = "draft" | "active" | "reserved" | "sold" | "archived";
+
 type ListingRow = {
   id: string;
   title: string;
   price: number;
   city: string | null;
-  status: string; // 'draft' | 'active' | 'reserved' | 'sold' | 'archived'
+  status: DbListingStatus;
   seller_id: string;
-  imageUrl?: string; // ✅ première image de l'annonce (si dispo)
+  imageUrl?: string; // première image de l'annonce (si dispo)
 };
 
-function mapStatus(dbStatus: string): UiListingStatus {
+function mapStatus(dbStatus: DbListingStatus): UiListingStatus {
   if (dbStatus === "draft") return "draft";
   if (dbStatus === "active") return "active";
   // reserved / sold / archived => "terminée" pour l'UI
@@ -33,6 +35,7 @@ function mapStatus(dbStatus: string): UiListingStatus {
 
 export default function MyListingsPage() {
   const { user, checking } = useRequireAuth();
+
   const [loading, setLoading] = useState(true);
   const [listings, setListings] = useState<ListingRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +44,7 @@ export default function MyListingsPage() {
   const [listingToDelete, setListingToDelete] = useState<ListingRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // ✅ handler suppression
-  // Appelé quand on clique sur "Supprimer" dans une carte
+  // 🔹 Ouvre la modal de confirmation
   const handleRequestDelete = (listingId: string) => {
     const listing = listings.find((l) => l.id === listingId);
     if (!listing) return;
@@ -51,7 +53,7 @@ export default function MyListingsPage() {
     setConfirmModalOpen(true);
   };
 
-  // Appelé quand on clique sur "Supprimer" dans le pop-up
+  // 🔹 Supprime réellement l’annonce
   const handleConfirmDelete = async () => {
     if (!listingToDelete) return;
 
@@ -104,7 +106,7 @@ export default function MyListingsPage() {
           )
           .eq("seller_id", user.id)
           .order("created_at", { ascending: false })
-          // ✅ on récupère au plus une image par annonce, triée par position
+          // on récupère au plus une image par annonce, triée par position
           .order("position", { foreignTable: "listing_images", ascending: true })
           .limit(1, { foreignTable: "listing_images" });
 
@@ -126,7 +128,7 @@ export default function MyListingsPage() {
             title: row.title,
             price: row.price,
             city: row.city,
-            status: row.status,
+            status: row.status as DbListingStatus,
             seller_id: row.seller_id,
             imageUrl: firstImage,
           };
@@ -220,12 +222,12 @@ export default function MyListingsPage() {
                 {activeListings.map((listing) => (
                     <MyListingCard
                         key={listing.id}
-                        id={listing.id.toString()}
+                        id={listing.id}
                         title={listing.title}
                         price={listing.price / 100}
                         location={listing.city ?? "Non renseigné"}
                         status={mapStatus(listing.status)}
-                        imageUrl={listing.imageUrl} // ✅ première image
+                        imageUrl={listing.imageUrl}
                         onDelete={handleRequestDelete}
                     />
                 ))}
@@ -251,7 +253,7 @@ export default function MyListingsPage() {
                         price={listing.price / 100}
                         location={listing.city ?? "Non renseigné"}
                         status={mapStatus(listing.status)}
-                        imageUrl={listing.imageUrl} // ✅ première image
+                        imageUrl={listing.imageUrl}
                         onDelete={handleRequestDelete}
                     />
                 ))}
@@ -271,7 +273,6 @@ export default function MyListingsPage() {
             }}
             title="Supprimer l’annonce"
             description="Cette action est définitive et ne peut pas être annulée."
-            // variant par défaut : on utilise children + footer
             footer={
               <div className="flex justify-end gap-2">
                 <Button
