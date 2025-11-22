@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AccountForm } from "@/components/account/account-form";
-import { AccountSidebar } from "@/components/account/account-sidebar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AppModal } from "@/components/modals/app-modal";
 import { changePassword } from "@/lib/auth/changePassword";
 import Link from "next/link";
 import { AvatarCropperDialog } from "@/components/avatar/avatar-cropper-dialog";
+import { AccountSidebar } from "@/components/account/account-sidebar";
+import type { AccountReview } from "@/components/account/account-reviews";
 
 type Stats = {
     listings: number;
@@ -52,6 +53,18 @@ type AccountFormValues = {
     gender: "female" | "male" | "other" | "unspecified";
 };
 
+// 🔹 ce type correspond aux lignes "reviews" côté Supabase
+type ReviewRow = {
+    id: string;
+    rating: number;
+    comment: string | null;
+    reviewer: {
+        id: string;
+        display_name: string | null;
+        avatar_url: string | null;
+    }[] | null; // 👈 tableau, pas objet
+};
+
 export function AccountPageClient() {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<Stats>({
@@ -71,6 +84,11 @@ export function AccountPageClient() {
     const [croppedAvatarBlob, setCroppedAvatarBlob] = useState<Blob | null>(null);
     const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
     const [avatarCropperOpen, setAvatarCropperOpen] = useState(false);
+
+    // 🔹 États pour les avis du compte
+    const [ratingAvg, setRatingAvg] = useState<number | null>(null);
+    const [reviewsCount, setReviewsCount] = useState<number>(0);
+    const [reviews, setReviews] = useState<AccountReview[]>([]);
 
     // Nettoyage de l'URL de prévisualisation à l'unmount
     useEffect(() => {
@@ -99,35 +117,55 @@ export function AccountPageClient() {
             }
 
             setEmail(user.email ?? "");
-            setUserId(user.id); // on garde l'id pour l'upload d'avatar
+            setUserId(user.id);
 
-            // 2) Profil + stats + adresse en parallèle
-            const [profileRes, listingsRes, salesRes, purchasesRes, addressRes] =
-                await Promise.all([
-                    supabase
-                        .from("profiles")
-                        .select(
-                            "id, display_name, username, first_name, last_name, gender, city, country, avatar_url, bio, phone_number",
-                        )
-                        .eq("id", user.id)
-                        .single(),
-                    supabase
-                        .from("listings")
-                        .select("id")
-                        .eq("seller_id", user.id)
-                        .in("status", ["draft", "active", "sold"]),
-                    supabase.from("orders").select("id").eq("seller_id", user.id),
-                    supabase.from("orders").select("id").eq("buyer_id", user.id),
-                    supabase
-                        .from("addresses")
-                        .select("line1, line2, city, postcode, country")
-                        .eq("user_id", user.id)
-                        .limit(1)
-                        .maybeSingle(),
-                ]);
+            // 2) Profil + stats + adresse + avis en parallèle
+            const [
+                profileRes,
+                listingsRes,
+                salesRes,
+                purchasesRes,
+                addressRes,
+                reviewsRes,
+            ] = await Promise.all([
+                supabase
+                    .from("profiles")
+                    .select(
+                        "id, display_name, username, first_name, last_name, gender, city, country, avatar_url, bio, phone_number",
+                    )
+                    .eq("id", user.id)
+                    .single(),
+                supabase
+                    .from("listings")
+                    .select("id")
+                    .eq("seller_id", user.id)
+                    .in("status", ["draft", "active", "sold"]),
+                supabase.from("orders").select("id").eq("seller_id", user.id),
+                supabase.from("orders").select("id").eq("buyer_id", user.id),
+                supabase
+                    .from("addresses")
+                    .select("line1, line2, city, postcode, country")
+                    .eq("user_id", user.id)
+                    .limit(1)
+                    .maybeSingle(),
+                supabase
+                    .from("reviews")
+                    .select(`
+            id,
+            rating,
+            comment,
+            reviewer:profiles!reviews_reviewer_id_fkey(
+              id,
+              display_name,
+              avatar_url
+            )
+          `)
+                    .eq("reviewed_id", user.id)
+                    .order("created_at", { ascending: false }),
+            ]);
 
+            // Profil
             if (profileRes.error) {
-                // Fallback minimal si le profil n’existe pas encore (rare, mais possible)
                 console.error("Erreur chargement profil :", profileRes.error);
                 setProfile({
                     id: user.id,
@@ -149,10 +187,10 @@ export function AccountPageClient() {
                 setProfile(profileRes.data as ProfileRow);
             }
 
+            // Adresse
             if (!addressRes.error && addressRes.data) {
                 setAddress(addressRes.data as AddressRow);
             } else {
-                // Si pas d’adresse en base, tenter depuis les métadonnées d’inscription
                 setAddress({
                     line1: user.user_metadata?.address_line1 ?? null,
                     line2: null,
@@ -162,17 +200,55 @@ export function AccountPageClient() {
                 });
             }
 
+            // Stats
             setStats({
                 listings: (listingsRes.data ?? []).length,
                 sales: (salesRes.data ?? []).length,
                 purchases: (purchasesRes.data ?? []).length,
             });
 
+            // Avis reçus
+            if (!reviewsRes.error && reviewsRes.data) {
+                const rows = (reviewsRes.data ?? []) as ReviewRow[];
+
+                const mapped: AccountReview[] = rows.map((r) => {
+                    const reviewer = r.reviewer?.[0]; // 👈 on prend le premier profil lié
+
+                    return {
+                        id: r.id,
+                        author: reviewer?.display_name ?? "Membre Élan",
+                        authorAvatar: reviewer?.avatar_url ?? null,
+                        reviewerId: reviewer?.id ?? null,
+                        rating: r.rating ?? 0,
+                        content: r.comment ?? "",
+                    };
+                });
+
+                setReviews(mapped);
+                setReviewsCount(rows.length);
+
+                if (rows.length > 0) {
+                    const avg =
+                        rows.reduce((sum, r) => sum + (r.rating ?? 0), 0) /
+                        rows.length;
+                    setRatingAvg(avg);
+                } else {
+                    setRatingAvg(null);
+                }
+            } else {
+                if (reviewsRes.error) {
+                    console.error("Erreur chargement avis compte:", reviewsRes.error);
+                }
+                setReviews([]);
+                setReviewsCount(0);
+                setRatingAvg(null);
+            }
+
             setLoading(false);
         };
 
         load();
-    }, []);
+    }, [avatarPreviewUrl]);
 
     // 🔹 Quand l'utilisateur choisit un nouveau fichier avatar (depuis AccountForm)
     const handleAvatarFileSelected = (file: File | null) => {
@@ -317,7 +393,7 @@ export function AccountPageClient() {
                 : prev,
         );
 
-        // 3. Upsert de l'adresse (si tous les champs nécessaires sont renseignés)
+        // 3. Upsert de l'adresse
         const hasAddress =
             values.addressLine1.trim() &&
             values.city.trim() &&
@@ -356,7 +432,6 @@ export function AccountPageClient() {
         }
 
         // 4. Upload de la nouvelle photo de profil
-        //    -> priorité au fichier recadré, sinon fallback sur avatarFile existant
         const avatarFileToUpload = croppedAvatarBlob
             ? new File([croppedAvatarBlob], "avatar.jpg", { type: "image/jpeg" })
             : null;
@@ -384,12 +459,10 @@ export function AccountPageClient() {
                 }
 
                 const publicUrl: string = data.publicUrl;
-                // Ajout d’un paramètre pour casser le cache navigateur
                 const cacheBustedUrl = publicUrl.includes("?")
                     ? `${publicUrl}&t=${Date.now()}`
                     : `${publicUrl}?t=${Date.now()}`;
 
-                // Mettre à jour le profil local
                 setProfile((prev) =>
                     prev
                         ? {
@@ -399,7 +472,6 @@ export function AccountPageClient() {
                         : prev,
                 );
 
-                // 🔔 Informer le header (et potentiellement d'autres composants)
                 if (typeof window !== "undefined") {
                     window.dispatchEvent(
                         new CustomEvent("elan:avatar-updated", {
@@ -408,7 +480,6 @@ export function AccountPageClient() {
                     );
                 }
 
-                // reset du blob recadré après upload réussi
                 setCroppedAvatarBlob(null);
                 if (avatarPreviewUrl) {
                     URL.revokeObjectURL(avatarPreviewUrl);
@@ -481,26 +552,29 @@ export function AccountPageClient() {
                         onSubmit={handleAccountSubmit}
                         onChangePasswordClick={() => setPasswordModalOpen(true)}
                         onAvatarFileSelected={handleAvatarFileSelected}
-                        onDeleteAvatar={handleDeleteAvatar}      // ⬅️ nouveau
+                        onDeleteAvatar={handleDeleteAvatar}
                     />
                 </Card>
 
                 <Card className="rounded-2xl border p-6">
-                    <AccountSidebar stats={stats} />
+                    <AccountSidebar
+                        stats={stats}
+                        ratingAvg={ratingAvg}
+                        reviewsCount={reviewsCount}
+                        reviews={reviews}
+                    />
                 </Card>
-
-                {/* ✅ MODAL CHANGEMENT MOT DE PASSE */}
-                <AppModal
-                    variant="change-password"
-                    open={passwordModalOpen}
-                    onOpenChange={setPasswordModalOpen}
-                    onSubmit={async ({ currentPassword, newPassword }) => {
-                        await changePassword(currentPassword, newPassword);
-                    }}
-                />
             </div>
 
-            {/* 🔹 Modal de recadrage d’avatar */}
+            <AppModal
+                variant="change-password"
+                open={passwordModalOpen}
+                onOpenChange={setPasswordModalOpen}
+                onSubmit={async ({ currentPassword, newPassword }) => {
+                    await changePassword(currentPassword, newPassword);
+                }}
+            />
+
             <AvatarCropperDialog
                 open={avatarCropperOpen}
                 onOpenChange={setAvatarCropperOpen}
