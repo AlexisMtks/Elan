@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AccountForm } from "@/components/account/account-form";
-import { AccountActivity } from "@/components/account/account-activity";
+import { AccountSidebar } from "@/components/account/account-sidebar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AppModal } from "@/components/modals/app-modal";
@@ -486,7 +486,7 @@ export function AccountPageClient() {
                 </Card>
 
                 <Card className="rounded-2xl border p-6">
-                    <AccountActivity stats={stats} />
+                    <AccountSidebar stats={stats} />
                 </Card>
 
                 {/* ✅ MODAL CHANGEMENT MOT DE PASSE */}
