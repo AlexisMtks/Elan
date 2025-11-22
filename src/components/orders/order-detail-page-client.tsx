@@ -8,9 +8,10 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 import { OrderStatusBar } from "@/components/orders/order-status-bar";
 import { OrderSellerInfo } from "@/components/orders/order-seller-info";
 import { OrderBuyerInfo } from "@/components/orders/order-buyer-info";
-// import { OrderTimeline } from "@/components/orders/order-timeline";
 import { DetailRow } from "@/components/misc/detail-row";
 import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 type DbListingImageRow = {
     image_url: string;
@@ -210,9 +211,7 @@ function mapOrderRowToUi(order: DbOrderRow): UiOrder {
     return uiOrder;
 }
 
-export default function OrderDetailPageClient({
-                                                  orderId,
-                                              }: OrderDetailPageClientProps) {
+export default function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
     const { user, checking } = useRequireAuth();
     const router = useRouter();
 
@@ -220,6 +219,19 @@ export default function OrderDetailPageClient({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // ⭐ Avis du vendeur sur l'acheteur
+    const [buyerRating, setBuyerRating] = useState<number>(0);
+    const [buyerComment, setBuyerComment] = useState<string>("");
+    const [buyerReviewId, setBuyerReviewId] = useState<string | null>(null);
+    const [buyerSubmitting, setBuyerSubmitting] = useState(false);
+
+    // ⭐ Avis de l'acheteur sur le vendeur
+    const [sellerRating, setSellerRating] = useState<number>(0);
+    const [sellerComment, setSellerComment] = useState<string>("");
+    const [sellerReviewId, setSellerReviewId] = useState<string | null>(null);
+    const [sellerSubmitting, setSellerSubmitting] = useState(false);
+
+    // 1️⃣ Charger la commande
     useEffect(() => {
         if (checking) return;
         if (!user) return; // useRequireAuth s'occupe de la redirection
@@ -230,45 +242,43 @@ export default function OrderDetailPageClient({
 
             const { data, error } = await supabase
                 .from("orders")
-                .select(
-                    `
-    id,
-    created_at,
-    status,
-    total_amount,
-    shipping_method,
-    shipping_address_line1,
-    shipping_address_line2,
-    shipping_city,
-    shipping_postcode,
-    shipping_country,
-    estimated_delivery_date,
-    seller:profiles!orders_seller_id_fkey(
-      id,
-      display_name,
-      listings_count,
-      avatar_url
-    ),
-    buyer:profiles!orders_buyer_id_fkey(
-      id,
-      display_name,
-      avatar_url
-    ),
-    order_items (
-      listing_id,
-      title_snapshot,
-      price_snapshot,
-      quantity,
-      listing:listings!order_items_listing_id_fkey (
-        id,
-        listing_images (
-          image_url,
-          position
-        )
-      )
-    )
-  `,
-                )
+                .select(`
+          id,
+          created_at,
+          status,
+          total_amount,
+          shipping_method,
+          shipping_address_line1,
+          shipping_address_line2,
+          shipping_city,
+          shipping_postcode,
+          shipping_country,
+          estimated_delivery_date,
+          seller:profiles!orders_seller_id_fkey(
+            id,
+            display_name,
+            listings_count,
+            avatar_url
+          ),
+          buyer:profiles!orders_buyer_id_fkey(
+            id,
+            display_name,
+            avatar_url
+          ),
+          order_items (
+            listing_id,
+            title_snapshot,
+            price_snapshot,
+            quantity,
+            listing:listings!order_items_listing_id_fkey (
+              id,
+              listing_images (
+                image_url,
+                position
+              )
+            )
+          )
+        `)
                 .eq("id", orderId)
                 .maybeSingle();
 
@@ -287,6 +297,61 @@ export default function OrderDetailPageClient({
         void load();
     }, [checking, user, orderId]);
 
+    // 2️⃣ Avis du vendeur sur l'acheteur
+    useEffect(() => {
+        if (!user || !order) return;
+        // on s'assure qu'on est bien le vendeur
+        if (user.id !== order.seller.id) return;
+
+        const fetchExistingReview = async () => {
+            const { data, error } = await supabase
+                .from("reviews")
+                .select("id, rating, comment")
+                .eq("reviewer_id", user.id)
+                .eq("reviewed_id", order.buyer.id)
+                .eq("order_id", order.id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (!error && data) {
+                setBuyerRating(data.rating ?? 0);
+                setBuyerReviewId(data.id);
+                setBuyerComment(data.comment ?? "");
+            }
+        };
+
+        void fetchExistingReview();
+    }, [user, order]);
+
+    // 3️⃣ Avis de l'acheteur sur le vendeur
+    useEffect(() => {
+        if (!user || !order) return;
+        // on s'assure qu'on est bien l'acheteur
+        if (user.id !== order.buyer.id) return;
+
+        const fetchExistingReview = async () => {
+            const { data, error } = await supabase
+                .from("reviews")
+                .select("id, rating, comment")
+                .eq("reviewer_id", user.id)
+                .eq("reviewed_id", order.seller.id)
+                .eq("order_id", order.id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (!error && data) {
+                setSellerRating(data.rating ?? 0);
+                setSellerReviewId(data.id);
+                setSellerComment(data.comment ?? "");
+            }
+        };
+
+        void fetchExistingReview();
+    }, [user, order]);
+
+    // 3️⃣ Ensuite seulement, les returns conditionnels
     if (checking || loading) {
         return (
             <div className="flex min-h-[200px] items-center justify-center">
@@ -314,8 +379,194 @@ export default function OrderDetailPageClient({
         );
     }
 
-    const isBuyerView = user?.id === order.buyer.id;
-    const isSellerView = user?.id === order.seller.id;
+    // ---------- Vendeur → Acheteur ----------
+    const upsertBuyerReview = async (
+        newRating: number,
+        newComment: string,
+    ) => {
+        if (!user || !order || !isSellerView) return;
+        if (newRating < 1 || newRating > 5) return;
+
+        setBuyerSubmitting(true);
+
+        try {
+            if (buyerReviewId) {
+                const { error } = await supabase
+                    .from("reviews")
+                    .update({
+                        rating: newRating,
+                        comment: newComment,
+                        reviewer_avatar_url: order.seller.avatarUrl ?? null,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", buyerReviewId);
+
+                if (error) {
+                    console.error("Erreur update avis acheteur :", error);
+                }
+            } else {
+                const { data, error } = await supabase
+                    .from("reviews")
+                    .insert({
+                        reviewer_id: user.id,          // vendeur
+                        reviewed_id: order.buyer.id,   // acheteur
+                        order_id: order.id,
+                        rating: newRating,
+                        comment: newComment,
+                        reviewer_avatar_url: order.seller.avatarUrl ?? null,
+                    })
+                    .select("id")
+                    .single();
+
+                if (error) {
+                    console.error("Erreur insert avis acheteur :", error);
+                } else if (data?.id) {
+                    setBuyerReviewId(data.id);
+                }
+            }
+        } finally {
+            setBuyerSubmitting(false);
+        }
+    };
+
+    const handleBuyerRatingChange = async (newRating: number) => {
+        setBuyerRating(newRating);
+        await upsertBuyerReview(newRating, buyerComment);
+    };
+
+    const handleBuyerSaveComment = async () => {
+        if (!buyerRating) return;
+        await upsertBuyerReview(buyerRating, buyerComment);
+    };
+
+    const buyerCommentId = `order-${order.id}-buyer-comment`;
+
+    // ---------- Acheteur → Vendeur ----------
+    const upsertSellerReview = async (
+        newRating: number,
+        newComment: string,
+    ) => {
+        if (!user || !order || !isBuyerView) return;
+        if (newRating < 1 || newRating > 5) return;
+
+        setSellerSubmitting(true);
+
+        try {
+            if (sellerReviewId) {
+                const { error } = await supabase
+                    .from("reviews")
+                    .update({
+                        rating: newRating,
+                        comment: newComment,
+                        reviewer_avatar_url: order.buyer.avatarUrl ?? null,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", sellerReviewId);
+
+                if (error) {
+                    console.error("Erreur update avis vendeur :", error);
+                }
+            } else {
+                const { data, error } = await supabase
+                    .from("reviews")
+                    .insert({
+                        reviewer_id: user.id,          // acheteur
+                        reviewed_id: order.seller.id,  // vendeur
+                        order_id: order.id,
+                        rating: newRating,
+                        comment: newComment,
+                        reviewer_avatar_url: order.buyer.avatarUrl ?? null,
+                    })
+                    .select("id")
+                    .single();
+
+                if (error) {
+                    console.error("Erreur insert avis vendeur :", error);
+                } else if (data?.id) {
+                    setSellerReviewId(data.id);
+                }
+            }
+        } finally {
+            setSellerSubmitting(false);
+        }
+    };
+
+    const handleSellerRatingChange = async (newRating: number) => {
+        setSellerRating(newRating);
+        await upsertSellerReview(newRating, sellerComment);
+    };
+
+    const handleSellerSaveComment = async () => {
+        if (!sellerRating) return;
+        await upsertSellerReview(sellerRating, sellerComment);
+    };
+
+    const sellerCommentId = `order-${order.id}-seller-comment`;
+
+    const isBuyerView = !!(user && order && user.id === order.buyer.id);
+    const isSellerView = !!(user && order && user.id === order.seller.id);
+
+    const upsertReview = async (newRating: number, newComment: string) => {
+        if (!user || !order || !isSellerView) return;
+        if (newRating < 1 || newRating > 5) return;
+
+        setSubmitting(true);
+
+        try {
+            if (reviewId) {
+                // 🔁 UPDATE
+                const { error } = await supabase
+                    .from("reviews")
+                    .update({
+                        rating: newRating,
+                        comment: newComment,
+                        reviewer_avatar_url: order.seller.avatarUrl ?? null,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", reviewId);
+
+                if (error) {
+                    console.error("Erreur update avis acheteur :", error);
+                }
+            } else {
+                // 🆕 INSERT
+                const { data, error } = await supabase
+                    .from("reviews")
+                    .insert({
+                        reviewer_id: user.id,
+                        reviewed_id: order.buyer.id,
+                        order_id: order.id,
+                        rating: newRating,
+                        comment: newComment,
+                        reviewer_avatar_url: order.seller.avatarUrl ?? null,
+                    })
+                    .select("id")
+                    .single();
+
+                if (error) {
+                    console.error("Erreur insert avis acheteur :", error);
+                } else if (data?.id) {
+                    setReviewId(data.id);
+                }
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleRatingChange = async (newRating: number) => {
+        setRating(newRating);
+        await upsertReview(newRating, comment);
+    };
+
+    const handleSaveComment = async () => {
+        if (!rating) return; // on impose une note avant de sauver un commentaire
+        await upsertReview(rating, comment);
+    };
+
+    const commentId = order
+        ? `order-${order.id}-buyer-comment`
+        : "order-comment-placeholder";
 
     return (
         <div className="space-y-10">
@@ -404,41 +655,113 @@ export default function OrderDetailPageClient({
                             />
                         </dl>
 
-                        {/* Côté acheteur → on montre le vendeur, côté vendeur → on montre l'acheteur */}
+                        {/* Côté acheteur → on montre le vendeur */}
                         {isBuyerView && (
                             <OrderSellerInfo
                                 id={order.seller.id}
                                 name={order.seller.name}
                                 listingsCount={order.seller.listingsCount}
                                 avatarUrl={order.seller.avatarUrl}
-                                orderId={order.id}
-                                reviewerId={user?.id ?? ""}
+                                rating={sellerRating}
+                                submitting={sellerSubmitting}
+                                onChangeRating={handleSellerRatingChange}
                             />
                         )}
 
+                        {/* Côté vendeur → on montre l'acheteur */}
                         {isSellerView && (
                             <OrderBuyerInfo
                                 id={order.buyer.id}
                                 name={order.buyer.name}
                                 completedOrdersCount={order.buyer.completedOrdersCount}
                                 avatarUrl={order.buyer.avatarUrl}
-                                orderId={order.id}
-                                reviewerId={user?.id ?? ""}
+                                rating={buyerRating}
+                                submitting={buyerSubmitting}
+                                onChangeRating={handleBuyerRatingChange}
                             />
                         )}
 
-                        {/* Fallback (ni buyer ni seller : cas anormal, on montre le vendeur) */}
+                        {/* Fallback (ni buyer ni seller : cas anormal, on montre le vendeur sans interaction) */}
                         {!isBuyerView && !isSellerView && (
                             <OrderSellerInfo
                                 id={order.seller.id}
                                 name={order.seller.name}
                                 listingsCount={order.seller.listingsCount}
                                 avatarUrl={order.seller.avatarUrl}
-                                orderId={order.id}
-                                reviewerId={user?.id ?? ""}
+                                rating={0}
+                                submitting
+                                onChangeRating={() => {}}
                             />
                         )}
                     </div>
+
+                    {/* Bloc commentaire pleine largeur côté vendeur (avis sur l'acheteur) */}
+                    {isSellerView && (
+                        <div className="mt-6 space-y-2">
+                            <label
+                                htmlFor={buyerCommentId}
+                                className="text-xs font-medium text-muted-foreground"
+                            >
+                                Commentaire sur l'acheteur (optionnel)
+                            </label>
+
+                            <Textarea
+                                id={buyerCommentId}
+                                value={buyerComment}
+                                onChange={(e) => setBuyerComment(e.target.value)}
+                                placeholder="Ajouter un commentaire sur cette vente"
+                                rows={3}
+                                className="w-full text-xs"
+                            />
+
+                            <div className="flex justify-end">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleBuyerSaveComment}
+                                    disabled={buyerSubmitting || buyerRating === 0}
+                                    className="px-5"
+                                >
+                                    Enregistrer le commentaire
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Bloc commentaire pleine largeur côté acheteur (avis sur le vendeur) */}
+                    {isBuyerView && (
+                        <div className="mt-6 space-y-2">
+                            <label
+                                htmlFor={sellerCommentId}
+                                className="text-xs font-medium text-muted-foreground"
+                            >
+                                Commentaire sur le vendeur (optionnel)
+                            </label>
+
+                            <Textarea
+                                id={sellerCommentId}
+                                value={sellerComment}
+                                onChange={(e) => setSellerComment(e.target.value)}
+                                placeholder="Ajouter un commentaire sur cette vente"
+                                rows={3}
+                                className="w-full text-xs"
+                            />
+
+                            <div className="flex justify-end">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleSellerSaveComment}
+                                    disabled={sellerSubmitting || sellerRating === 0}
+                                    className="px-5"
+                                >
+                                    Enregistrer le commentaire
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </Card>
             </section>
 
