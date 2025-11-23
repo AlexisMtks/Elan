@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import { useState } from "react";
 import { Heart, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -20,12 +21,17 @@ export function FloatingActions() {
     const router = useRouter();
     const pathname = usePathname();
 
+    const [cartOpen, setCartOpen] = useState(false);
+    const [favoritesOpen, setFavoritesOpen] = useState(false);
+
     const cartCount = useCartCounter(userId);
     const favoritesCount = useFavoritesCounter(userId);
 
     const { items: cartItems, loading: cartLoading } = useCartPreview(userId);
-    const { items: favoritesItems, loading: favoritesLoading } =
-        useFavoritesPreview(userId);
+    const {
+        items: favoritesItems,
+        loading: favoritesLoading,
+    } = useFavoritesPreview(userId);
 
     const hideOnRoutes = ["/login", "/register", "/logout"];
     if (hideOnRoutes.includes(pathname)) {
@@ -37,17 +43,116 @@ export function FloatingActions() {
     }
 
     const handleGoToCart = () => {
-        router.push("/cart"); // à ajuster quand tu feras la page panier
+        setCartOpen(false);
+        router.push("/cart");
     };
 
     const handleGoToFavorites = () => {
-        router.push("/favorites"); // à ajuster quand tu feras la page favoris
+        setFavoritesOpen(false);
+        router.push("/favorites");
     };
 
     return (
-        <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3">            {/* ❤️ Bouton + menu favoris – seulement si connecté */}
+        <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3">
+            {/* 🛒 Panier */}
+            <DropdownMenu open={cartOpen} onOpenChange={setCartOpen}>
+                <DropdownMenuTrigger asChild>
+                    <div className="pointer-events-auto relative">
+                        <Button
+                            type="button"
+                            size="icon"
+                            variant="secondary"
+                            className="h-12 w-12 rounded-full shadow-lg"
+                            aria-label="Mon panier"
+                        >
+                            <ShoppingCart className="h-5 w-5" />
+                        </Button>
+
+                        {cartCount > 0 && (
+                            <span
+                                className="
+                  absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center
+                  rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground
+                  shadow
+                "
+                            >
+                {cartCount}
+              </span>
+                        )}
+                    </div>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent
+                    side="top"
+                    align="end"
+                    className="w-80 rounded-2xl border bg-popover p-3 shadow-lg"
+                >
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold">Mon panier</p>
+                            {cartCount > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                  {cartCount} article{cartCount > 1 ? "s" : ""}
+                </span>
+                            )}
+                        </div>
+
+                        <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                            {cartLoading ? (
+                                <p className="text-xs text-muted-foreground">
+                                    Chargement du panier…
+                                </p>
+                            ) : cartItems.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                    Votre panier est vide.
+                                </p>
+                            ) : (
+                                cartItems.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="flex items-center gap-2 rounded-lg bg-muted/40 p-2 text-xs"
+                                    >
+                                        <div className="h-10 w-10 overflow-hidden rounded-md bg-muted">
+                                            {item.imageUrl ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img
+                                                    src={item.imageUrl}
+                                                    alt={item.title}
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="flex h-full w-full items-center justify-center text-[9px] text-muted-foreground">
+                                                    Photo
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex min-w-0 flex-1 flex-col">
+                                            <p className="line-clamp-2 text-[11px] font-medium">
+                                                {item.title}
+                                            </p>
+                                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                                {(item.price / 100).toFixed(2)} €
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={handleGoToCart}
+                            className="w-full rounded-full border bg-background px-3 py-1.5 text-center text-xs font-medium hover:bg-accent"
+                        >
+                            Voir le panier
+                        </button>
+                    </div>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* ❤️ Favoris (si connecté) */}
             {user && (
-                <DropdownMenu>
+                <DropdownMenu open={favoritesOpen} onOpenChange={setFavoritesOpen}>
                     <DropdownMenuTrigger asChild>
                         <div className="pointer-events-auto relative">
                             <Button
@@ -143,102 +248,6 @@ export function FloatingActions() {
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}
-
-            {/* 🛒 Bouton + menu panier */}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <div className="pointer-events-auto relative">
-                        <Button
-                            type="button"
-                            size="icon"
-                            variant="secondary"
-                            className="h-12 w-12 rounded-full shadow-lg"
-                            aria-label="Mon panier"
-                        >
-                            <ShoppingCart className="h-5 w-5" />
-                        </Button>
-
-                        {cartCount > 0 && (
-                            <span
-                                className="
-                  absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center
-                  rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground
-                  shadow
-                "
-                            >
-                {cartCount}
-              </span>
-                        )}
-                    </div>
-                </DropdownMenuTrigger>
-
-                <DropdownMenuContent
-                    side="top"
-                    align="end"
-                    className="w-80 rounded-2xl border bg-popover p-3 shadow-lg"
-                >
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold">Mon panier</p>
-                            {cartCount > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                  {cartCount} article{cartCount > 1 ? "s" : ""}
-                </span>
-                            )}
-                        </div>
-
-                        <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                            {cartLoading ? (
-                                <p className="text-xs text-muted-foreground">
-                                    Chargement du panier…
-                                </p>
-                            ) : cartItems.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">
-                                    Votre panier est vide.
-                                </p>
-                            ) : (
-                                cartItems.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        className="flex items-center gap-2 rounded-lg bg-muted/40 p-2 text-xs"
-                                    >
-                                        <div className="h-10 w-10 overflow-hidden rounded-md bg-muted">
-                                            {item.imageUrl ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img
-                                                    src={item.imageUrl}
-                                                    alt={item.title}
-                                                    className="h-full w-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="flex h-full w-full items-center justify-center text-[9px] text-muted-foreground">
-                                                    Photo
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex min-w-0 flex-1 flex-col">
-                                            <p className="line-clamp-2 text-[11px] font-medium">
-                                                {item.title}
-                                            </p>
-                                            <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                                {(item.price / 100).toFixed(2)} €
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={handleGoToCart}
-                            className="w-full rounded-full border bg-background px-3 py-1.5 text-center text-xs font-medium hover:bg-accent"
-                        >
-                            Voir le panier
-                        </button>
-                    </div>
-                </DropdownMenuContent>
-            </DropdownMenu>
         </div>
     );
 }

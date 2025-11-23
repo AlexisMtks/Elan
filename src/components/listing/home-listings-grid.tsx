@@ -90,7 +90,7 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         );
     }
 
-    // On attend que auth + favoris + panier soient prêts
+    // On attend que auth + favorites + panier soient prêts
     if (checking || favoritesLoading || cartLoading) {
         return (
             <p className="text-sm text-muted-foreground">

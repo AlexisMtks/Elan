@@ -30,7 +30,7 @@ export function useFavoritesPreview(userId?: string) {
             setLoading(true);
             setError(null);
 
-            // 1) Récupère les listing_id des favoris
+            // 1) Récupère les listing_id des favorites
             const { data: favRows, error: favError } = await supabase
                 .from("favorites")
                 .select("listing_id")
@@ -39,9 +39,9 @@ export function useFavoritesPreview(userId?: string) {
             if (cancelled) return;
 
             if (favError) {
-                console.error("Erreur chargement favoris preview :", favError);
+                console.error("Erreur chargement favorites preview :", favError);
                 setItems([]);
-                setError("Impossible de charger vos favoris.");
+                setError("Impossible de charger vos favorites.");
                 setLoading(false);
                 return;
             }
@@ -79,9 +79,9 @@ export function useFavoritesPreview(userId?: string) {
             if (cancelled) return;
 
             if (listingsError) {
-                console.error("Erreur chargement listings favoris preview :", listingsError);
+                console.error("Erreur chargement listings favorites preview :", listingsError);
                 setItems([]);
-                setError("Impossible de charger vos favoris.");
+                setError("Impossible de charger vos favorites.");
                 setLoading(false);
                 return;
             }
@@ -109,7 +109,7 @@ export function useFavoritesPreview(userId?: string) {
 
         void load();
 
-        // se resynchronise quand les favoris changent (toggle sur une card)
+        // se resynchronise quand les favorites changent (toggle sur une card)
         const handler = () => {
             void load();
         };

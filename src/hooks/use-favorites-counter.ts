@@ -25,7 +25,7 @@ export function useFavoritesCounter(userId?: string) {
             if (cancelled) return;
 
             if (error) {
-                console.error("Erreur chargement compteur favoris :", error);
+                console.error("Erreur chargement compteur favorites :", error);
                 setCount(0);
                 return;
             }

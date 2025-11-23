@@ -32,7 +32,7 @@ export function AccountSidebar({
                 reviews={reviews}
             />
 
-            {/* 🔜 plus tard : amis, favoris, etc. */}
+            {/* 🔜 plus tard : amis, favorites, etc. */}
         </div>
     );
 }

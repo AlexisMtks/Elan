@@ -85,7 +85,7 @@ export function ProductCard({
     const [isFavorite, setIsFavorite] = useState<boolean>(initialIsFavorite);
     const [isInCart, setIsInCart] = useState<boolean>(initialIsInCart);
 
-    // synchro si les props changent (par ex. après rechargement des favoris)
+    // synchro si les props changent (par ex. après rechargement des favorites)
     useEffect(() => {
         setIsFavorite(initialIsFavorite);
     }, [initialIsFavorite]);
@@ -183,8 +183,8 @@ export function ProductCard({
                                 aria-pressed={isFavorite}
                                 aria-label={
                                     isFavorite
-                                        ? "Retirer des favoris"
-                                        : "Ajouter aux favoris"
+                                        ? "Retirer des favorites"
+                                        : "Ajouter aux favorites"
                                 }
                             >
                                 <Heart

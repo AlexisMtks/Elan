@@ -12,7 +12,7 @@ export function useFavorites(userId?: string) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Charge les favoris de l'utilisateur
+    // Charge les favorites de l'utilisateur
     useEffect(() => {
         if (!userId) {
             setFavorites(new Set());
@@ -35,9 +35,9 @@ export function useFavorites(userId?: string) {
             if (cancelled) return;
 
             if (error) {
-                console.error("Erreur chargement favoris :", error);
+                console.error("Erreur chargement favorites :", error);
                 setFavorites(new Set());
-                setError("Impossible de charger vos favoris.");
+                setError("Impossible de charger vos favorites.");
                 setLoading(false);
                 return;
             }
@@ -94,11 +94,11 @@ export function useFavorites(userId?: string) {
                         copy.delete(listingId);
                         return copy;
                     });
-                    setError("Impossible d’ajouter aux favoris.");
+                    setError("Impossible d’ajouter aux favorites.");
                     return;
                 }
 
-                // 🔔 Notifie le reste de l’app que les favoris ont changé
+                // 🔔 Notifie le reste de l’app que les favorites ont changé
                 if (typeof window !== "undefined") {
                     window.dispatchEvent(
                         new CustomEvent("elan_favorites_updated", {
@@ -121,7 +121,7 @@ export function useFavorites(userId?: string) {
                         copy.add(listingId);
                         return copy;
                     });
-                    setError("Impossible de retirer des favoris.");
+                    setError("Impossible de retirer des favorites.");
                     return;
                 }
 
