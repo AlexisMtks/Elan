@@ -188,27 +188,30 @@ export function ProductCard({
                 {/* 🔹 Icônes maintenant en bas à droite de la CARD */}
                 {showActions && (
                     <div className="absolute bottom-2 right-2 flex gap-1">
-                        {/* Bouton favoris */}
-                        <button
-                            type="button"
-                            onClick={handleToggleFavorite}
-                            className={cn(
-                                "inline-flex h-8 w-8 items-center justify-center rounded-full border bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm transition",
-                                "hover:bg-background hover:text-primary",
-                                isFavorite && "border-primary/60 bg-primary/10 text-primary",
-                            )}
-                            aria-pressed={isFavorite}
-                            aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
-                        >
-                            <Heart
-                                className={cn(
-                                    "h-4 w-4",
-                                    isFavorite && "fill-current",
-                                )}
-                            />
-                        </button>
 
-                        {/* Bouton panier */}
+                        {/* ❤️ Bouton favoris uniquement si connecté */}
+                        {currentUser && (
+                            <button
+                                type="button"
+                                onClick={handleToggleFavorite}
+                                className={cn(
+                                    "inline-flex h-8 w-8 items-center justify-center rounded-full border bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm transition",
+                                    "hover:bg-background hover:text-primary",
+                                    isFavorite && "border-primary/60 bg-primary/10 text-primary",
+                                )}
+                                aria-pressed={isFavorite}
+                                aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+                            >
+                                <Heart
+                                    className={cn(
+                                        "h-4 w-4",
+                                        isFavorite && "fill-current",
+                                    )}
+                                />
+                            </button>
+                        )}
+
+                        {/* 🛒 Bouton panier : toujours affiché */}
                         <button
                             type="button"
                             onClick={handleToggleCart}
@@ -227,6 +230,7 @@ export function ProductCard({
                                 )}
                             />
                         </button>
+
                     </div>
                 )}
 
