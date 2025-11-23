@@ -60,16 +60,6 @@ export function ProductCard({
     const clickableProp = clickable;
     const isClickable = clickableProp && !isOwnProfilePage;
 
-    if (process.env.NODE_ENV !== "production") {
-        console.log("🧩 ProductCard debug", {
-            id,
-            clickableProp,
-            isOwnProfilePage,
-            isClickable,
-            profileIdInUrl,
-            currentUserId: currentUser?.id ?? null,
-        });
-    }
 
     const Wrapper: React.ComponentType<
         React.ComponentProps<"div"> & { href?: string }
@@ -105,28 +95,24 @@ export function ProductCard({
         setIsInCart(initialIsInCart);
     }, [initialIsInCart]);
 
-    const handleToggleFavorite = (
-        event: React.MouseEvent<HTMLButtonElement>,
-    ) => {
+    // --- handlers ---
+
+    const handleToggleFavorite = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
         event.stopPropagation();
 
-        setIsFavorite((prev) => {
-            const next = !prev;
-            onToggleFavorite?.(next);
-            return next;
-        });
+        const next = !isFavorite;          // 👈 on calcule à partir de la valeur actuelle
+        setIsFavorite(next);               // on met à jour le state local
+        onToggleFavorite?.(next);          // puis on notifie le parent (useFavorites)
     };
 
     const handleToggleCart = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
         event.stopPropagation();
 
-        setIsInCart((prev) => {
-            const next = !prev;
-            onToggleCart?.(next);
-            return next;
-        });
+        const next = !isInCart;
+        setIsInCart(next);
+        onToggleCart?.(next);
     };
 
     return (
@@ -185,10 +171,9 @@ export function ProductCard({
                     </div>
                 </Wrapper>
 
-                {/* 🔹 Icônes maintenant en bas à droite de la CARD */}
+                {/* 🔹 Icônes en bas à droite de la CARD */}
                 {showActions && (
                     <div className="absolute bottom-2 right-2 flex gap-1">
-
                         {/* ❤️ Bouton favoris uniquement si connecté */}
                         {currentUser && (
                             <button
@@ -211,7 +196,7 @@ export function ProductCard({
                             </button>
                         )}
 
-                        {/* 🛒 Bouton panier : toujours affiché */}
+                        {/* 🛒 Bouton panier : toujours visible */}
                         <button
                             type="button"
                             onClick={handleToggleCart}
@@ -230,7 +215,6 @@ export function ProductCard({
                                 )}
                             />
                         </button>
-
                     </div>
                 )}
 

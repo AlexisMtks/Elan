@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProductCard } from "@/components/cards/product-card";
+import { useFavorites } from "@/hooks/use-favorites";
 
 type HomeProduct = {
     id: string;
@@ -47,7 +48,7 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
 
         void loadInitialUser();
 
-        // ✅ écoute des changements de session (login / logout)
+        // écoute des changements de session (login / logout)
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -66,7 +67,9 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         };
     }, []);
 
-    // Le message d'erreur est déjà géré par le parent
+    const { isFavorite, toggleFavorite } = useFavorites(userId ?? undefined);
+
+    // Message d’erreur géré par la page
     if (hasError) {
         return null;
     }
@@ -89,6 +92,7 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         );
     }
 
+    // Masquer les annonces de l’utilisateur connecté
     const filteredProducts =
         userId === null ? products : products.filter((p) => p.sellerId !== userId);
 
@@ -102,7 +106,7 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         );
     }
 
-    // 🔟 On garde les 10 premières après filtrage
+    // On garde les 10 premières après filtrage
     const visibleProducts = filteredProducts.slice(0, 10);
 
     return (
@@ -131,6 +135,11 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
                             location={p.city ?? undefined}
                             variant="compact"
                             imageUrl={p.imageUrl}
+                            initialIsFavorite={!!userId && isFavorite(p.id)}
+                            onToggleFavorite={(next) => {
+                                if (!userId) return; // par sécurité, mais le bouton est déjà masqué si non connecté
+                                void toggleFavorite(p.id, next);
+                            }}
                         />
                     </div>
                 ))}

@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProductCard } from "@/components/cards/product-card";
+import { useFavorites } from "@/hooks/use-favorites";
 
 type ListingRow = {
     id: string;
@@ -19,14 +20,17 @@ interface SearchListingsGridProps {
     hasError: boolean;
 }
 
-export function SearchListingsGrid({ listings, hasError }: SearchListingsGridProps) {
+export function SearchListingsGrid({
+                                       listings,
+                                       hasError,
+                                   }: SearchListingsGridProps) {
     const [userId, setUserId] = useState<string | null>(null);
     const [checking, setChecking] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
 
-        async function loadInitialUser() {
+        const loadInitialUser = async () => {
             try {
                 const { data, error } = await supabase.auth.getUser();
 
@@ -42,11 +46,11 @@ export function SearchListingsGrid({ listings, hasError }: SearchListingsGridPro
                     setChecking(false);
                 }
             }
-        }
+        };
 
         void loadInitialUser();
 
-        // 🔁 Écoute live des changements d'auth (login / logout)
+        // Écoute live des changements d'auth (login / logout)
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -64,6 +68,8 @@ export function SearchListingsGrid({ listings, hasError }: SearchListingsGridPro
             subscription.unsubscribe();
         };
     }, []);
+
+    const { isFavorite, toggleFavorite } = useFavorites(userId ?? undefined);
 
     if (hasError) {
         return null;
@@ -91,18 +97,17 @@ export function SearchListingsGrid({ listings, hasError }: SearchListingsGridPro
     if (filteredListings.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
-                Aucun résultat ne correspond à votre recherche (vos propres annonces actives sont masquées).
+                Aucun résultat, vos propres annonces étant masquées.
             </p>
         );
     }
 
-    const visibleCount = filteredListings.length;
-
     return (
-        <div className="space-y-3">
+        <section className="space-y-3">
             <p className="text-sm text-muted-foreground">
-                {visibleCount}{" "}
-                {visibleCount > 1 ? "annonces trouvées" : "annonce trouvée"}
+                {filteredListings.length} résultat
+                {filteredListings.length > 1 ? "s" : ""} trouvé
+                {filteredListings.length > 1 ? "s" : ""}.
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -121,10 +126,15 @@ export function SearchListingsGrid({ listings, hasError }: SearchListingsGridPro
                             location={p.city ?? undefined}
                             variant="compact"
                             imageUrl={p.imageUrl}
+                            initialIsFavorite={!!userId && isFavorite(p.id)}
+                            onToggleFavorite={(next) => {
+                                if (!userId) return;
+                                void toggleFavorite(p.id, next);
+                            }}
                         />
                     </div>
                 ))}
             </div>
-        </div>
+        </section>
     );
 }

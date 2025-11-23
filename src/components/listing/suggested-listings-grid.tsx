@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProductCard } from "@/components/cards/product-card";
+import { useFavorites } from "@/hooks/use-favorites";
 
 type ListingRow = {
     id: string;
@@ -18,7 +19,9 @@ interface SuggestedListingsGridProps {
     listings: ListingRow[];
 }
 
-export function SuggestedListingsGrid({ listings }: SuggestedListingsGridProps) {
+export function SuggestedListingsGrid({
+                                          listings,
+                                      }: SuggestedListingsGridProps) {
     const [userId, setUserId] = useState<string | null>(null);
     const [checking, setChecking] = useState(true);
 
@@ -42,14 +45,28 @@ export function SuggestedListingsGrid({ listings }: SuggestedListingsGridProps) 
             }
         };
 
-        loadUser();
+        void loadUser();
+
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (cancelled) return;
+
+            if (session?.user) {
+                setUserId(session.user.id);
+            } else {
+                setUserId(null);
+            }
+        });
 
         return () => {
             cancelled = true;
+            subscription.unsubscribe();
         };
     }, []);
 
-    // Pendant le chargement de l'auth, on ne rend rien
+    const { isFavorite, toggleFavorite } = useFavorites(userId ?? undefined);
+
     if (checking) {
         return null;
     }
@@ -80,6 +97,11 @@ export function SuggestedListingsGrid({ listings }: SuggestedListingsGridProps) 
                         location={p.city ?? undefined}
                         variant="compact"
                         imageUrl={p.imageUrl}
+                        initialIsFavorite={!!userId && isFavorite(p.id)}
+                        onToggleFavorite={(next) => {
+                            if (!userId) return;
+                            void toggleFavorite(p.id, next);
+                        }}
                     />
                 ))}
             </div>
