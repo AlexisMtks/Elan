@@ -32,7 +32,7 @@ function writeGuestCartToStorage(ids: string[]) {
             JSON.stringify(ids),
         );
     } catch {
-        // on ignore les erreurs de stockage
+        // ignore
     }
 }
 
@@ -59,7 +59,6 @@ export function useCart(userId?: string) {
             setLoading(true);
             setError(null);
 
-            // On cherche un panier "open" existant
             const { data: cart, error: cartError } = await supabase
                 .from("carts")
                 .select("id")
@@ -79,7 +78,6 @@ export function useCart(userId?: string) {
             }
 
             if (!cart) {
-                // Aucun panier open pour l'instant
                 setCartId(null);
                 setItems(new Set());
                 setLoading(false);
@@ -133,7 +131,7 @@ export function useCart(userId?: string) {
             const shouldBeInCart =
                 typeof next === "boolean" ? next : !currentlyInCart;
 
-            // 🟢 GUEST MODE : panier en sessionStorage
+            // 🟢 GUEST MODE
             if (!userId) {
                 setItems((prev) => {
                     const copy = new Set(prev);
@@ -142,21 +140,28 @@ export function useCart(userId?: string) {
                     } else {
                         copy.delete(listingId);
                     }
-                    // sync storage
                     writeGuestCartToStorage(Array.from(copy));
                     return copy;
                 });
+
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(
+                        new CustomEvent("elan_cart_updated", {
+                            detail: { listingId, inCart: shouldBeInCart },
+                        }),
+                    );
+                }
+
                 return;
             }
 
-            // 🟢 USER MODE : panier en BDD (carts + cart_items)
+            // 🟢 USER MODE
             setError(null);
 
             // Ajout au panier
             if (shouldBeInCart) {
                 let currentCartId = cartId;
 
-                // Crée un panier open si nécessaire
                 if (!currentCartId) {
                     const { data: newCart, error: createError } = await supabase
                         .from("carts")
@@ -174,7 +179,7 @@ export function useCart(userId?: string) {
                     setCartId(newCart.id);
                 }
 
-                // Mise à jour optimiste
+                // Optimiste
                 setItems((prev) => {
                     const copy = new Set(prev);
                     copy.add(listingId);
@@ -190,23 +195,28 @@ export function useCart(userId?: string) {
                 if (insertError) {
                     console.error("Erreur ajout article panier :", insertError);
                     setError("Impossible d’ajouter cet article au panier.");
-                    // rollback
                     setItems((prev) => {
                         const copy = new Set(prev);
                         copy.delete(listingId);
                         return copy;
                     });
+                    return;
+                }
+
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(
+                        new CustomEvent("elan_cart_updated", {
+                            detail: { listingId, inCart: true },
+                        }),
+                    );
                 }
 
                 return;
             }
 
             // Retrait du panier
-            if (!cartId) {
-                return; // rien à faire si pas de panier
-            }
+            if (!cartId) return;
 
-            // Mise à jour optimiste
             setItems((prev) => {
                 const copy = new Set(prev);
                 copy.delete(listingId);
@@ -222,20 +232,28 @@ export function useCart(userId?: string) {
             if (deleteError) {
                 console.error("Erreur retrait article panier :", deleteError);
                 setError("Impossible de retirer cet article du panier.");
-                // rollback
                 setItems((prev) => {
                     const copy = new Set(prev);
                     copy.add(listingId);
                     return copy;
                 });
+                return;
+            }
+
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                    new CustomEvent("elan_cart_updated", {
+                        detail: { listingId, inCart: false },
+                    }),
+                );
             }
         },
         [cartId, items, userId],
     );
 
     return {
-        isInCart,      // (listingId: string) => boolean
-        toggleCart,    // (listingId: string, next?: boolean) => Promise<void> | void
+        isInCart,
+        toggleCart,
         loading,
         error,
     };

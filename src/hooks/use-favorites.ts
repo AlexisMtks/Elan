@@ -70,7 +70,7 @@ export function useFavorites(userId?: string) {
             const shouldBeFavorite =
                 typeof next === "boolean" ? next : !currentlyFavorite;
 
-            // Mise à jour optimiste
+            // Mise à jour optimiste locale
             setFavorites((prev) => {
                 const copy = new Set(prev);
                 if (shouldBeFavorite) {
@@ -95,6 +95,16 @@ export function useFavorites(userId?: string) {
                         return copy;
                     });
                     setError("Impossible d’ajouter aux favoris.");
+                    return;
+                }
+
+                // 🔔 Notifie le reste de l’app que les favoris ont changé
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(
+                        new CustomEvent("elan_favorites_updated", {
+                            detail: { listingId, inFavorites: true },
+                        }),
+                    );
                 }
             } else {
                 const { error } = await supabase
@@ -112,6 +122,15 @@ export function useFavorites(userId?: string) {
                         return copy;
                     });
                     setError("Impossible de retirer des favoris.");
+                    return;
+                }
+
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(
+                        new CustomEvent("elan_favorites_updated", {
+                            detail: { listingId, inFavorites: false },
+                        }),
+                    );
                 }
             }
         },
