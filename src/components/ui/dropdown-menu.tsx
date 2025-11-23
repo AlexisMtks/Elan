@@ -8,9 +8,15 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 function DropdownMenu({
-                        ...props
+                          ...props
                       }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+    return (
+        <DropdownMenuPrimitive.Root
+            data-slot="dropdown-menu"
+            modal={false}          // ← ⭐ La clé magique
+            {...props}
+        />
+    )
 }
 
 function DropdownMenuPortal({
