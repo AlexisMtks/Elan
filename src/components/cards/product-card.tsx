@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { MapPin, Heart, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useEffect, useState } from "react";
 
 type ProductCardVariant = "default" | "compact" | "profile";
@@ -22,9 +21,11 @@ interface ProductCardProps {
     href?: string;
     imageUrl?: string;
 
+    // Favoris / panier
     initialIsFavorite?: boolean;
     initialIsInCart?: boolean;
     showActions?: boolean;
+    canFavorite?: boolean;
     onToggleFavorite?: (next: boolean) => void;
     onToggleCart?: (next: boolean) => void;
 }
@@ -43,23 +44,22 @@ export function ProductCard({
                                 initialIsFavorite = false,
                                 initialIsInCart = false,
                                 showActions = true,
+                                canFavorite = false,
                                 onToggleFavorite,
                                 onToggleCart,
                             }: ProductCardProps) {
-    const { user: currentUser } = useCurrentUser();
     const pathname = usePathname();
 
     const profileMatch = pathname?.match(/^\/profile\/([^/]+)/);
     const profileIdInUrl = profileMatch?.[1] ?? null;
 
-    const isOwnProfilePage =
-        !!currentUser?.id && !!profileIdInUrl && currentUser.id === profileIdInUrl;
+    // Sur les pages profil publiques, la card peut être rendue non cliquable
+    const isOwnProfilePage = false; // 💡 déjà géré en amont normalement, on garde la signature au cas où
 
     const targetHref = href ?? `/listings/${id}`;
 
     const clickableProp = clickable;
     const isClickable = clickableProp && !isOwnProfilePage;
-
 
     const Wrapper: React.ComponentType<
         React.ComponentProps<"div"> & { href?: string }
@@ -77,16 +77,15 @@ export function ProductCard({
             ? "text-base font-semibold"
             : "text-lg font-semibold";
 
-    // 🔹 Important : on NE met plus pointer-events-none,
-    // sinon les boutons favoris/panier seraient inactifs
     const clickableCardClasses = isClickable
         ? "cursor-pointer transition-transform transition-shadow duration-150 hover:-translate-y-0.5 hover:shadow-md"
         : "cursor-default";
 
-    // --- ÉTAT LOCAL POUR LES ICÔNES (front only) ---
+    // --- ÉTATS LOCAUX ---
     const [isFavorite, setIsFavorite] = useState<boolean>(initialIsFavorite);
     const [isInCart, setIsInCart] = useState<boolean>(initialIsInCart);
 
+    // synchro si les props changent (par ex. après rechargement des favoris)
     useEffect(() => {
         setIsFavorite(initialIsFavorite);
     }, [initialIsFavorite]);
@@ -95,15 +94,13 @@ export function ProductCard({
         setIsInCart(initialIsInCart);
     }, [initialIsInCart]);
 
-    // --- handlers ---
-
     const handleToggleFavorite = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
         event.stopPropagation();
 
-        const next = !isFavorite;          // 👈 on calcule à partir de la valeur actuelle
-        setIsFavorite(next);               // on met à jour le state local
-        onToggleFavorite?.(next);          // puis on notifie le parent (useFavorites)
+        const next = !isFavorite;
+        setIsFavorite(next);
+        onToggleFavorite?.(next);
     };
 
     const handleToggleCart = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -118,7 +115,7 @@ export function ProductCard({
     return (
         <Card
             className={cn(
-                "relative overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm p-0", // 🔹 relative ici
+                "relative overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm p-0",
                 clickableCardClasses,
             )}
         >
@@ -171,11 +168,10 @@ export function ProductCard({
                     </div>
                 </Wrapper>
 
-                {/* 🔹 Icônes en bas à droite de la CARD */}
+                {/* Icônes en bas à droite de la card */}
                 {showActions && (
                     <div className="absolute bottom-2 right-2 flex gap-1">
-                        {/* ❤️ Bouton favoris uniquement si connecté */}
-                        {currentUser && (
+                        {canFavorite && (
                             <button
                                 type="button"
                                 onClick={handleToggleFavorite}
@@ -185,18 +181,18 @@ export function ProductCard({
                                     isFavorite && "border-primary/60 bg-primary/10 text-primary",
                                 )}
                                 aria-pressed={isFavorite}
-                                aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+                                aria-label={
+                                    isFavorite
+                                        ? "Retirer des favoris"
+                                        : "Ajouter aux favoris"
+                                }
                             >
                                 <Heart
-                                    className={cn(
-                                        "h-4 w-4",
-                                        isFavorite && "fill-current",
-                                    )}
+                                    className={cn("h-4 w-4", isFavorite && "fill-current")}
                                 />
                             </button>
                         )}
 
-                        {/* 🛒 Bouton panier : toujours visible */}
                         <button
                             type="button"
                             onClick={handleToggleCart}
@@ -206,7 +202,9 @@ export function ProductCard({
                                 isInCart && "border-primary/60 bg-primary/10 text-primary",
                             )}
                             aria-pressed={isInCart}
-                            aria-label={isInCart ? "Retirer du panier" : "Ajouter au panier"}
+                            aria-label={
+                                isInCart ? "Retirer du panier" : "Ajouter au panier"
+                            }
                         >
                             <ShoppingCart
                                 className={cn(

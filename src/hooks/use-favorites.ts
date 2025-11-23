@@ -12,7 +12,7 @@ export function useFavorites(userId?: string) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Chargement initial des favoris de l'utilisateur
+    // Charge les favoris de l'utilisateur
     useEffect(() => {
         if (!userId) {
             setFavorites(new Set());
@@ -36,14 +36,14 @@ export function useFavorites(userId?: string) {
 
             if (error) {
                 console.error("Erreur chargement favoris :", error);
-                setError("Impossible de charger vos favoris pour le moment.");
                 setFavorites(new Set());
+                setError("Impossible de charger vos favoris.");
                 setLoading(false);
                 return;
             }
 
             const ids = new Set<string>(
-                (data as FavoriteRow[] | null)?.map((row) => row.listing_id) ?? [],
+                (data ?? []).map((row: FavoriteRow) => row.listing_id),
             );
 
             setFavorites(ids);
@@ -62,19 +62,9 @@ export function useFavorites(userId?: string) {
         [favorites],
     );
 
-    /**
-     * Toggle en BDD + mise à jour optimiste.
-     * - next === true  => ajoute en favoris
-     * - next === false => supprime des favoris
-     */
     const toggleFavorite = useCallback(
         async (listingId: string, next?: boolean) => {
-            if (!userId) {
-                console.warn("toggleFavorite appelé sans userId");
-                return;
-            }
-
-            setError(null);
+            if (!userId) return;
 
             const currentlyFavorite = favorites.has(listingId);
             const shouldBeFavorite =
@@ -98,13 +88,13 @@ export function useFavorites(userId?: string) {
 
                 if (error) {
                     console.error("Erreur ajout favori :", error);
-                    setError("Impossible d’ajouter cette annonce aux favoris.");
                     // rollback
                     setFavorites((prev) => {
                         const copy = new Set(prev);
                         copy.delete(listingId);
                         return copy;
                     });
+                    setError("Impossible d’ajouter aux favoris.");
                 }
             } else {
                 const { error } = await supabase
@@ -115,13 +105,13 @@ export function useFavorites(userId?: string) {
 
                 if (error) {
                     console.error("Erreur suppression favori :", error);
-                    setError("Impossible de retirer cette annonce des favoris.");
                     // rollback
                     setFavorites((prev) => {
                         const copy = new Set(prev);
                         copy.add(listingId);
                         return copy;
                     });
+                    setError("Impossible de retirer des favoris.");
                 }
             }
         },

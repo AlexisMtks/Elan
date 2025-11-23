@@ -1,4 +1,3 @@
-// src/components/listing/suggested-listings-grid.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -65,18 +64,20 @@ export function SuggestedListingsGrid({
         };
     }, []);
 
-    const { isFavorite, toggleFavorite } = useFavorites(userId ?? undefined);
+    const {
+        isFavorite,
+        toggleFavorite,
+        loading: favoritesLoading,
+    } = useFavorites(userId ?? undefined);
 
-    if (checking) {
+    if (checking || favoritesLoading) {
         return null;
     }
 
-    // On exclut les annonces du vendeur connecté
     const filtered = listings.filter(
         (listing) => !userId || listing.sellerId !== userId,
     );
 
-    // Si après filtrage il ne reste plus rien → pas de section
     if (filtered.length === 0) {
         return null;
     }
@@ -97,6 +98,7 @@ export function SuggestedListingsGrid({
                         location={p.city ?? undefined}
                         variant="compact"
                         imageUrl={p.imageUrl}
+                        canFavorite={!!userId}
                         initialIsFavorite={!!userId && isFavorite(p.id)}
                         onToggleFavorite={(next) => {
                             if (!userId) return;

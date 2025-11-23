@@ -1,4 +1,3 @@
-// src/components/listing/search-listings-grid.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -50,7 +49,6 @@ export function SearchListingsGrid({
 
         void loadInitialUser();
 
-        // Écoute live des changements d'auth (login / logout)
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -69,7 +67,11 @@ export function SearchListingsGrid({
         };
     }, []);
 
-    const { isFavorite, toggleFavorite } = useFavorites(userId ?? undefined);
+    const {
+        isFavorite,
+        toggleFavorite,
+        loading: favoritesLoading,
+    } = useFavorites(userId ?? undefined);
 
     if (hasError) {
         return null;
@@ -83,16 +85,18 @@ export function SearchListingsGrid({
         );
     }
 
-    if (checking) {
+    if (checking || favoritesLoading) {
         return (
             <p className="text-sm text-muted-foreground">
-                Chargement des résultats...
+                Chargement des résultats…
             </p>
         );
     }
 
     const filteredListings =
-        userId === null ? listings : listings.filter((l) => l.sellerId !== userId);
+        userId === null
+            ? listings
+            : listings.filter((l) => l.sellerId !== userId);
 
     if (filteredListings.length === 0) {
         return (
@@ -115,8 +119,8 @@ export function SearchListingsGrid({
                     <div
                         key={p.id}
                         className="
-                transition-transform transition-shadow duration-200
-                hover:-translate-y-1 hover:shadow-lg
+              transition-transform transition-shadow duration-200
+              hover:-translate-y-1 hover:shadow-lg
             "
                     >
                         <ProductCard
@@ -126,6 +130,7 @@ export function SearchListingsGrid({
                             location={p.city ?? undefined}
                             variant="compact"
                             imageUrl={p.imageUrl}
+                            canFavorite={!!userId}
                             initialIsFavorite={!!userId && isFavorite(p.id)}
                             onToggleFavorite={(next) => {
                                 if (!userId) return;

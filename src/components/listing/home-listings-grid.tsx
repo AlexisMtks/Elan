@@ -1,4 +1,3 @@
-// src/components/listing/home-listings-grid.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -9,7 +8,7 @@ import { useFavorites } from "@/hooks/use-favorites";
 type HomeProduct = {
     id: string;
     title: string;
-    price: number; // en centimes
+    price: number; // centimes
     city: string | null;
     status: string;
     sellerId: string;
@@ -48,7 +47,6 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
 
         void loadInitialUser();
 
-        // écoute des changements de session (login / logout)
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -67,14 +65,16 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         };
     }, []);
 
-    const { isFavorite, toggleFavorite } = useFavorites(userId ?? undefined);
+    const {
+        isFavorite,
+        toggleFavorite,
+        loading: favoritesLoading,
+    } = useFavorites(userId ?? undefined);
 
-    // Message d’erreur géré par la page
     if (hasError) {
         return null;
     }
 
-    // Cas : aucune annonce en base
     if (products.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
@@ -83,30 +83,29 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         );
     }
 
-    // Pendant qu'on vérifie la session → petit message de chargement
-    if (checking) {
+    // ✅ On attend que l'auth ET les favoris soient chargés
+    if (checking || favoritesLoading) {
         return (
             <p className="text-sm text-muted-foreground">
-                Chargement des annonces...
+                Chargement des annonces…
             </p>
         );
     }
 
-    // Masquer les annonces de l’utilisateur connecté
     const filteredProducts =
-        userId === null ? products : products.filter((p) => p.sellerId !== userId);
+        userId === null
+            ? products
+            : products.filter((p) => p.sellerId !== userId);
 
-    // Cas : il y avait des annonces, mais elles sont toutes à l'utilisateur connecté
     if (filteredProducts.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
-                Aucune annonce disponible pour le moment (vos propres annonces actives
-                sont masquées).
+                Aucune annonce disponible pour le moment (vos propres annonces
+                actives sont masquées).
             </p>
         );
     }
 
-    // On garde les 10 premières après filtrage
     const visibleProducts = filteredProducts.slice(0, 10);
 
     return (
@@ -135,9 +134,10 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
                             location={p.city ?? undefined}
                             variant="compact"
                             imageUrl={p.imageUrl}
+                            canFavorite={!!userId}
                             initialIsFavorite={!!userId && isFavorite(p.id)}
                             onToggleFavorite={(next) => {
-                                if (!userId) return; // par sécurité, mais le bouton est déjà masqué si non connecté
+                                if (!userId) return;
                                 void toggleFavorite(p.id, next);
                             }}
                         />
