@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProductCard } from "@/components/cards/product-card";
 import { useFavorites } from "@/hooks/use-favorites";
+import { useCart } from "@/hooks/use-cart";
 
 type ListingRow = {
     id: string;
@@ -73,6 +74,12 @@ export function SearchListingsGrid({
         loading: favoritesLoading,
     } = useFavorites(userId ?? undefined);
 
+    const {
+        isInCart,
+        toggleCart,
+        loading: cartLoading,
+    } = useCart(userId ?? undefined);
+
     if (hasError) {
         return null;
     }
@@ -85,7 +92,7 @@ export function SearchListingsGrid({
         );
     }
 
-    if (checking || favoritesLoading) {
+    if (checking || favoritesLoading || cartLoading) {
         return (
             <p className="text-sm text-muted-foreground">
                 Chargement des résultats…
@@ -135,6 +142,10 @@ export function SearchListingsGrid({
                             onToggleFavorite={(next) => {
                                 if (!userId) return;
                                 void toggleFavorite(p.id, next);
+                            }}
+                            initialIsInCart={isInCart(p.id)}
+                            onToggleCart={(next) => {
+                                void toggleCart(p.id, next);
                             }}
                         />
                     </div>

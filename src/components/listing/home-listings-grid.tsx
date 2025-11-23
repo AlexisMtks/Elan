@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProductCard } from "@/components/cards/product-card";
 import { useFavorites } from "@/hooks/use-favorites";
+import { useCart } from "@/hooks/use-cart";
 
 type HomeProduct = {
     id: string;
@@ -71,6 +72,12 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         loading: favoritesLoading,
     } = useFavorites(userId ?? undefined);
 
+    const {
+        isInCart,
+        toggleCart,
+        loading: cartLoading,
+    } = useCart(userId ?? undefined);
+
     if (hasError) {
         return null;
     }
@@ -83,8 +90,8 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
         );
     }
 
-    // ✅ On attend que l'auth ET les favoris soient chargés
-    if (checking || favoritesLoading) {
+    // On attend que auth + favoris + panier soient prêts
+    if (checking || favoritesLoading || cartLoading) {
         return (
             <p className="text-sm text-muted-foreground">
                 Chargement des annonces…
@@ -139,6 +146,10 @@ export function HomeListingsGrid({ products, hasError }: HomeListingsGridProps) 
                             onToggleFavorite={(next) => {
                                 if (!userId) return;
                                 void toggleFavorite(p.id, next);
+                            }}
+                            initialIsInCart={isInCart(p.id)}
+                            onToggleCart={(next) => {
+                                void toggleCart(p.id, next);
                             }}
                         />
                     </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProductCard } from "@/components/cards/product-card";
 import { useFavorites } from "@/hooks/use-favorites";
+import { useCart } from "@/hooks/use-cart";
 
 type ListingRow = {
     id: string;
@@ -70,7 +71,13 @@ export function SuggestedListingsGrid({
         loading: favoritesLoading,
     } = useFavorites(userId ?? undefined);
 
-    if (checking || favoritesLoading) {
+    const {
+        isInCart,
+        toggleCart,
+        loading: cartLoading,
+    } = useCart(userId ?? undefined);
+
+    if (checking || favoritesLoading || cartLoading) {
         return null;
     }
 
@@ -103,6 +110,10 @@ export function SuggestedListingsGrid({
                         onToggleFavorite={(next) => {
                             if (!userId) return;
                             void toggleFavorite(p.id, next);
+                        }}
+                        initialIsInCart={isInCart(p.id)}
+                        onToggleCart={(next) => {
+                            void toggleCart(p.id, next);
                         }}
                     />
                 ))}
